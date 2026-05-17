@@ -278,7 +278,7 @@ canvas{
   align-items:center;
   justify-content:center;
   overflow:hidden;
-  padding:14px 12px !important;
+  padding:10px 12px !important;
 }
 
 .card .metric{
@@ -3007,9 +3007,9 @@ header{
     </div>
 
     <!-- Listados por categoría -->
-    <div class="title">Gym · Torso</div>
+    <div class="title title-gym-torso">Gym · Torso</div>
     <div id="listaTorso"></div>
-    <div class="title">Gym · Pierna</div>
+    <div class="title title-gym-pierna">Gym · Pierna</div>
     <div id="listaPierna"></div>
     <div class="title" id="titleCrossfit" style="display:none">CrossFit</div>
     <div id="listaCrossfit"></div>
@@ -4760,7 +4760,7 @@ function detalleCompletoDiaHTML(fecha){
           <div class="meta">${w.tipo} · ${w.rx||"-"}</div>
           <span class="pill blue">${w.min||"-"} min</span>
           <span class="pill">${w.resultado||"-"}</span>
-          ${w.ejercicios&&w.ejercicios.length?`<div class="meta" style="margin-top:7px">${w.ejercicios.join(", ")}</div>`:""}
+          ${w.ejercicios&&w.ejercicios.length?`<div class="meta" style="margin-top:7px">${w.ejercicios.map(function(e){return typeof e==="object"?e.nombre+(e.kg?" "+e.kg+"kg":"")+(e.reps?" x"+e.reps:""):e;}).join(", ")}</div>`:""}
         </div>
       `).join("");
   }
@@ -5206,26 +5206,29 @@ function selEjCategoria(btn){
   btn.classList.add('active');
   var cat = btn.getAttribute('data-cat');
   document.getElementById('ejCategoria').value = cat;
+
+  // Gym fields
   var gymFields = document.getElementById('ejGymFields');
   if(gymFields) gymFields.style.display = cat === 'gym' ? 'block' : 'none';
 
-  // Mostrar/ocultar listas según categoría
+  // Gym lists - find by adjacent title
+  var tTorso = document.querySelector('.title-gym-torso');
+  var tPierna = document.querySelector('.title-gym-pierna');
+  var lTorso = document.getElementById('listaTorso');
+  var lPierna = document.getElementById('listaPierna');
   var showGym = cat === 'gym';
-  ['listaTorso','listaPierna'].forEach(function(id){
-    var el=document.getElementById(id); if(el) el.parentElement.style.display=showGym?'block':'none';
-  });
-  // Titles gym
-  document.querySelectorAll('.title').forEach(function(t){
-    if(t.textContent.includes('Gym ·')) t.style.display=showGym?'block':'none';
-  });
+  if(tTorso) tTorso.style.display = showGym ? 'block' : 'none';
+  if(tPierna) tPierna.style.display = showGym ? 'block' : 'none';
+  if(lTorso) lTorso.style.display = showGym ? 'block' : 'none';
+  if(lPierna) lPierna.style.display = showGym ? 'block' : 'none';
 
-  // Mostrar solo la lista de la categoría seleccionada
+  // Other category lists
   ['crossfit','running','cardio'].forEach(function(c){
     var lista=document.getElementById('lista'+c.charAt(0).toUpperCase()+c.slice(1));
     var title=document.getElementById('title'+c.charAt(0).toUpperCase()+c.slice(1));
-    var show = c===cat;
-    if(lista) lista.style.display=show?'block':'none';
-    if(title) title.style.display=show?'block':'none';
+    var show = c === cat;
+    if(lista) lista.style.display = show ? 'block' : 'none';
+    if(title) title.style.display = show ? 'block' : 'none';
   });
 }
 
@@ -5583,6 +5586,7 @@ function renderProgresoEjercicio(){
 
     <div class="card" style="margin-bottom:10px">
       <div class="item-title">Evolución de marca</div>
+      <div id="grafTooltip" style="display:none;background:#26332f;color:white;border-radius:10px;padding:6px 12px;font-size:13px;font-weight:700;text-align:center;margin-bottom:8px"></div>
       <canvas id="graf" width="700" height="300"></canvas>
       <div id="resumenGrafEjercicio"></div>
     </div>
@@ -5621,6 +5625,7 @@ function renderProgresoEjercicio(){
   setTimeout(()=>{
     draw(regs);
     renderResumenGrafEjercicio(regs);
+    initGrafTouch();
   },0);
 }
 
@@ -5902,7 +5907,7 @@ function renderProgresoWod(){
         <div class="meta">${formatFecha(w.fecha)} · ${w.tipo} · ${w.rx||"-"}</div>
         <span class="pill blue">${w.min||"-"} min</span>
         <span class="pill">${w.resultado||"-"}</span>
-        ${w.ejercicios&&w.ejercicios.length?`<div class="meta" style="margin-top:7px">${w.ejercicios.join(", ")}</div>`:""}
+        ${w.ejercicios&&w.ejercicios.length?`<div class="meta" style="margin-top:7px">${w.ejercicios.map(function(e){return typeof e==="object"?e.nombre+(e.kg?" "+e.kg+"kg":"")+(e.reps?" x"+e.reps:""):e;}).join(", ")}</div>`:""}
         ${w.notas?`<div class="meta" style="margin-top:7px">${w.notas}</div>`:""}
         <div class="actions">
           <button type="button" class="icon-action edit-icon" onclick="proEditar('crossfit',${w.id})">✏️</button>
@@ -5983,113 +5988,153 @@ function draw(regs){
 }
 function drawLineChart(ctx,c,data,suffix,color){
   const W=c.width,H=c.height;
-  const padL=72,padR=36,padT=44,padB=68;
+  const padL=64,padR=24,padT=20,padB=56;
 
   const values=data.map(x=>Number(x.v)).filter(v=>isFinite(v));
   const minRaw=Math.min(...values);
   const maxRaw=Math.max(...values);
-  const padding=(maxRaw-minRaw)*0.2 || Math.max(1,maxRaw*0.1);
-  const min=minRaw-padding;
+  const rawRange=maxRaw-minRaw;
+  const padding=rawRange>0?rawRange*0.25:Math.max(1,maxRaw*0.1);
+  const min=Math.max(0,minRaw-padding);
   const max=maxRaw+padding;
   const range=(max-min)||1;
 
   ctx.clearRect(0,0,W,H);
 
-  const bg=ctx.createLinearGradient(0,0,0,H);
-  bg.addColorStop(0,"#ffffff");
-  bg.addColorStop(1,"#f4f7f2");
-  ctx.fillStyle=bg;
+  // fondo blanco
+  ctx.fillStyle="#ffffff";
   ctx.fillRect(0,0,W,H);
 
   const px=i=>padL+(i/(data.length-1||1))*(W-padL-padR);
   const py=v=>H-padB-((v-min)/range)*(H-padT-padB);
 
-  // rejilla horizontal
+  // grid lines horizontales
+  const steps=5;
   ctx.strokeStyle="#e8ede6";
   ctx.lineWidth=1;
-  const fontSize=Math.max(16, Math.min(20, W/35));
-  ctx.font=`bold ${fontSize}px -apple-system,Arial`;
-  ctx.fillStyle="#728078";
+  ctx.font="13px -apple-system,Arial";
+  ctx.fillStyle="#999";
   ctx.textAlign="right";
 
-  for(let i=0;i<=4;i++){
-    const y=padT+i*((H-padT-padB)/4);
-    const val=max-i*(range/4);
+  for(let i=0;i<=steps;i++){
+    const y=padT+i*((H-padT-padB)/steps);
+    const val=max-i*(range/steps);
     ctx.beginPath();
     ctx.moveTo(padL,y);
     ctx.lineTo(W-padR,y);
     ctx.stroke();
-    ctx.fillText((Math.round(val*10)/10)+suffix, padL-8, y+fontSize*0.35);
+    ctx.fillText(Math.round(val*10)/10+suffix, padL-6, y+4);
   }
 
-  // línea suavizada
+  // eje Y izquierdo
+  ctx.strokeStyle="#ccc";
+  ctx.lineWidth=1;
+  ctx.beginPath();
+  ctx.moveTo(padL,padT);
+  ctx.lineTo(padL,H-padB);
+  ctx.stroke();
+
+  // eje X inferior
+  ctx.beginPath();
+  ctx.moveTo(padL,H-padB);
+  ctx.lineTo(W-padR,H-padB);
+  ctx.stroke();
+
+  // línea RECTA
   ctx.strokeStyle=color;
-  ctx.lineWidth=4;
+  ctx.lineWidth=2.5;
   ctx.lineJoin="round";
-  ctx.lineCap="round";
   ctx.beginPath();
   data.forEach((d,i)=>{
     const x=px(i), y=py(d.v);
-    if(i===0) ctx.moveTo(x,y);
-    else {
-      const prevX=px(i-1), prevY=py(data[i-1].v);
-      const midX=(prevX+x)/2;
-      ctx.bezierCurveTo(midX,prevY,midX,y,x,y);
-    }
+    if(i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y);
   });
   ctx.stroke();
 
-  // relleno
-  const area=ctx.createLinearGradient(0,padT,0,H-padB);
-  area.addColorStop(0,"rgba(111,143,122,.18)");
-  area.addColorStop(1,"rgba(111,143,122,0)");
-  ctx.lineTo(px(data.length-1),H-padB);
-  ctx.lineTo(px(0),H-padB);
-  ctx.closePath();
-  ctx.fillStyle=area;
-  ctx.fill();
-
-  // puntos y etiquetas
-  const labelSize=Math.max(14,Math.min(18,W/40));
+  // puntos
   data.forEach((d,i)=>{
     const x=px(i), y=py(d.v);
-    const prev=i>0?data[i-1]:null;
-    const diff=prev?+(d.v-prev.v).toFixed(1):0;
-
-    ctx.fillStyle="#ffffff";
+    ctx.fillStyle="#fff";
     ctx.beginPath();
-    ctx.arc(x,y,10,0,Math.PI*2);
+    ctx.arc(x,y,6,0,Math.PI*2);
     ctx.fill();
     ctx.strokeStyle=color;
-    ctx.lineWidth=3;
+    ctx.lineWidth=2.5;
     ctx.beginPath();
-    ctx.arc(x,y,8,0,Math.PI*2);
+    ctx.arc(x,y,5,0,Math.PI*2);
     ctx.stroke();
-
-    const mostrar=i===0||i===data.length-1||Math.abs(diff)>0;
-    if(mostrar){
-      ctx.fillStyle="#26332f";
-      ctx.font=`bold ${labelSize}px -apple-system,Arial`;
-      ctx.textAlign="center";
-      const label=d.v+suffix;
-      const labelY=y-16;
-      // fondo blanco para legibilidad
-      const tw=ctx.measureText(label).width;
-      ctx.fillStyle="rgba(255,255,255,.85)";
-      ctx.fillRect(x-tw/2-4,labelY-labelSize,tw+8,labelSize+4);
-      ctx.fillStyle="#26332f";
-      ctx.fillText(label,x,labelY);
-    }
-
-    ctx.save();
-    ctx.translate(x,H-36);
-    ctx.rotate(-0.45);
-    ctx.fillStyle="#728078";
-    ctx.font=`${labelSize-2}px -apple-system,Arial`;
-    ctx.textAlign="center";
-    ctx.fillText(formatFecha(d.fecha).slice(0,5),0,0);
-    ctx.restore();
   });
+
+  // fechas en eje X — solo primero, último y algunos intermedios
+  ctx.fillStyle="#999";
+  ctx.font="12px -apple-system,Arial";
+  ctx.textAlign="center";
+  data.forEach((d,i)=>{
+    const show = i===0 || i===data.length-1 || (data.length<=6) || (i%(Math.ceil(data.length/4))===0);
+    if(show){
+      const x=px(i);
+      ctx.save();
+      ctx.translate(x, H-padB+14);
+      ctx.rotate(-0.4);
+      ctx.fillText(formatFecha(d.fecha).slice(0,5),0,0);
+      ctx.restore();
+    }
+  });
+
+  // Guardar puntos para interacción táctil
+  c._chartData = data.map((d,i)=>({x:px(i), y:py(d.v), d:d}));
+}
+
+// Touch handler para la gráfica
+function initGrafTouch(){
+  const c = document.getElementById("graf");
+  if(!c || c._touchInited) return;
+  c._touchInited = true;
+  c.style.cursor = "pointer";
+
+  function handleTouch(evt){
+    evt.preventDefault();
+    const rect = c.getBoundingClientRect();
+    const scaleX = c.width / rect.width;
+    const touch = evt.touches ? evt.touches[0] : evt;
+    const mx = (touch.clientX - rect.left) * scaleX;
+    const my = (touch.clientY - rect.top) * (c.height / rect.height);
+
+    if(!c._chartData) return;
+
+    // Encontrar punto más cercano
+    let closest = null, minDist = 9999;
+    c._chartData.forEach(function(p){
+      const dist = Math.abs(p.x - mx);
+      if(dist < minDist){ minDist = dist; closest = p; }
+    });
+
+    if(closest && minDist < 60){
+      // Mostrar tooltip en detalleEjercicio o en modal
+      const d = closest.d;
+      const tooltip = document.getElementById("grafTooltip");
+      if(tooltip){
+        tooltip.textContent = formatFecha(d.fecha) + " — " + d.v + "kg";
+        tooltip.style.display = "block";
+        clearTimeout(window._tooltipTimer);
+        window._tooltipTimer = setTimeout(function(){ tooltip.style.display="none"; }, 3000);
+      }
+      // Resaltar punto tocado
+      const ctx = c.getContext("2d");
+      // Redibujar solo el punto activo más grande
+      ctx.fillStyle = "#6f8f7a";
+      ctx.beginPath();
+      ctx.arc(closest.x, closest.y, 9, 0, Math.PI*2);
+      ctx.fill();
+      ctx.fillStyle = "#fff";
+      ctx.beginPath();
+      ctx.arc(closest.x, closest.y, 5, 0, Math.PI*2);
+      ctx.fill();
+    }
+  }
+
+  c.addEventListener("touchstart", handleTouch, {passive:false});
+  c.addEventListener("click", handleTouch);
 }
 
 
