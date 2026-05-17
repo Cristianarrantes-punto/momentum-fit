@@ -2305,7 +2305,6 @@ header{
 }
 /* Fix avatar visibility */
 #userAvatarBtn{
-  display:none;
   width:34px !important;
   height:34px !important;
   border-radius:50% !important;
@@ -2496,7 +2495,7 @@ header{
     <div style="display:flex;gap:8px;align-items:center;position:relative">
       <button type="button" id="pwaInstallBtn" onclick="instalarPWA()" style="display:none;margin:0;padding:8px 14px;font-size:13px;font-weight:700;border-radius:20px;background:rgba(111,143,122,.15);color:var(--accent);border:1px solid rgba(111,143,122,.3);box-shadow:none;width:auto;align-items:center">⬇️ Instalar</button>
       <button type="button" class="quick-add" onclick="abrirRegistroRapido()">+ Serie</button>
-      <button type="button" id="userAvatarBtn" onclick="toggleUserMenu()" style="display:none;width:34px;height:34px;border-radius:50%;border:none;background:linear-gradient(135deg,var(--accent),var(--accent2));color:white;font-size:13px;font-weight:850;cursor:pointer;padding:0;margin:0;box-shadow:0 2px 8px rgba(74,92,80,.2);flex-shrink:0;align-items:center;justify-content:center">?</button>
+      <button type="button" id="userAvatarBtn" onclick="toggleUserMenu()" style="display:none;width:34px;height:34px;border-radius:50%;border:2px solid rgba(255,255,255,.3);background:linear-gradient(135deg,var(--accent),var(--accent2));color:white;font-size:13px;font-weight:850;cursor:pointer;padding:0;margin:0;flex-shrink:0;align-items:center;justify-content:center">CR</button>
       <!-- Mini menú -->
       <div id="userMenu" style="display:none;position:absolute;top:44px;right:0;background:white;border:1px solid rgba(111,143,122,.2);border-radius:16px;box-shadow:0 8px 28px rgba(38,51,47,.16);min-width:180px;z-index:500;overflow:hidden">
         <div id="userMenuEmail" style="padding:12px 16px;font-size:12px;color:var(--muted);border-bottom:1px solid rgba(111,143,122,.1);font-weight:600"></div>
@@ -2964,36 +2963,60 @@ header{
   <!-- Panel: Ejercicios -->
   <div id="panelEjercicios" style="display:none">
     <div class="card" style="margin-top:12px">
-      <label>Nombre</label>
-      <input id="nuevoEjercicio" placeholder="Ej: Remo Hammer">
-      <div class="row">
-        <div>
-          <label>División</label>
-          <select id="nuevoTipo">
-            <option>Torso</option>
-            <option>Pierna</option>
-          </select>
-        </div>
-        <div>
-          <label>Grupo muscular</label>
-          <select id="nuevoGrupo">
-            <option>Pecho</option>
-            <option>Espalda</option>
-            <option>Hombro</option>
-            <option>Bíceps</option>
-            <option>Tríceps</option>
-            <option>Pierna</option>
-            <option>Glúteo</option>
-            <option>Core</option>
-          </select>
+
+      <!-- Categoría principal -->
+      <label class="reg-label">Categoría</label>
+      <div class="ob-dias-grid" style="grid-template-columns:1fr 1fr;margin-bottom:12px" id="ejCatGrid">
+        <button type="button" class="obj-dia-btn active" data-cat="gym" onclick="selEjCategoria(this)">🏋️ Gym</button>
+        <button type="button" class="obj-dia-btn" data-cat="crossfit" onclick="selEjCategoria(this)">🔥 CrossFit</button>
+        <button type="button" class="obj-dia-btn" data-cat="running" onclick="selEjCategoria(this)">🏃 Running</button>
+        <button type="button" class="obj-dia-btn" data-cat="cardio" onclick="selEjCategoria(this)">🚴 Cardio</button>
+      </div>
+      <input type="hidden" id="ejCategoria" value="gym">
+
+      <label class="reg-label">Nombre del ejercicio</label>
+      <input id="nuevoEjercicio" placeholder="Ej: Remo Hammer, Snatch...">
+
+      <!-- Campos solo para gym -->
+      <div id="ejGymFields">
+        <div class="row">
+          <div>
+            <label class="reg-label">División</label>
+            <select id="nuevoTipo">
+              <option>Torso</option>
+              <option>Pierna</option>
+            </select>
+          </div>
+          <div>
+            <label class="reg-label">Grupo muscular</label>
+            <select id="nuevoGrupo">
+              <option>Pecho</option>
+              <option>Espalda</option>
+              <option>Hombro</option>
+              <option>Bíceps</option>
+              <option>Tríceps</option>
+              <option>Pierna</option>
+              <option>Glúteo</option>
+              <option>Core</option>
+            </select>
+          </div>
         </div>
       </div>
+
       <button type="button" onclick="addEjercicio()">Añadir ejercicio</button>
     </div>
-    <div class="title">Torso</div>
+
+    <!-- Listados por categoría -->
+    <div class="title">Gym · Torso</div>
     <div id="listaTorso"></div>
-    <div class="title">Pierna</div>
+    <div class="title">Gym · Pierna</div>
     <div id="listaPierna"></div>
+    <div class="title" id="titleCrossfit" style="display:none">CrossFit</div>
+    <div id="listaCrossfit"></div>
+    <div class="title" id="titleRunning" style="display:none">Running</div>
+    <div id="listaRunning"></div>
+    <div class="title" id="titleCardio" style="display:none">Cardio</div>
+    <div id="listaCardio"></div>
   </div>
 
 </section>
@@ -3323,6 +3346,7 @@ function toggleModuloTemporal(id,source){
   }else{
     db.settings.configured=true;
     localStorage.setItem(KEY,JSON.stringify(db));
+    guardarDatosNube();
     renderConfigModules();
     aplicarConfiguracion();
     renderAll();
@@ -3383,6 +3407,7 @@ function guardarConfiguracion(){
   ensureSettings();
   db.settings.configured=true;
   localStorage.setItem(KEY,JSON.stringify(db));
+  guardarDatosNube();
   aplicarConfiguracion();
   renderAll();
   mostrarConfirmacion("Configuración guardada.");
@@ -5176,24 +5201,64 @@ function aplicarRutinaRapida(){
   pintarSelectorEjercicios(r.ejercicios);
   document.getElementById("fEjercicio").value=r.ejercicios[0];
 }
+function selEjCategoria(btn){
+  document.querySelectorAll('#ejCatGrid .obj-dia-btn').forEach(function(b){ b.classList.remove('active'); });
+  btn.classList.add('active');
+  var cat = btn.getAttribute('data-cat');
+  document.getElementById('ejCategoria').value = cat;
+  var gymFields = document.getElementById('ejGymFields');
+  if(gymFields) gymFields.style.display = cat === 'gym' ? 'block' : 'none';
+}
+
 function addEjercicio(){
   const nombre=document.getElementById("nuevoEjercicio").value.trim();
-  const tipo=document.getElementById("nuevoTipo").value;const grupo=document.getElementById("nuevoGrupo").value;
-  if(!nombre){alert("Escribe el nombre del ejercicio.");return}
-  if(db.ejercicios.some(e=>e.nombre.toLowerCase()===nombre.toLowerCase())){alert("Ese ejercicio ya existe.");return}
-  db.ejercicios.push({id:Date.now(),nombre,grupo,tipo});document.getElementById("nuevoEjercicio").value="";save();vibrar(25);mostrarConfirmacion("✓ Ejercicio añadido");
+  const cat=document.getElementById("ejCategoria")?document.getElementById("ejCategoria").value:"gym";
+  const tipo=cat==="gym"?document.getElementById("nuevoTipo").value:"";
+  const grupo=cat==="gym"?document.getElementById("nuevoGrupo").value:cat;
+  if(!nombre){ mostrarConfirmacion("Escribe el nombre del ejercicio"); return; }
+  if(db.ejercicios.some(e=>e.nombre.toLowerCase()===nombre.toLowerCase())){ mostrarConfirmacion("Ese ejercicio ya existe"); return; }
+  db.ejercicios.push({id:Date.now(),nombre,grupo,tipo,categoria:cat});
+  document.getElementById("nuevoEjercicio").value="";
+  save();
+  guardarDatosNube();
+  vibrar(25);
+  mostrarConfirmacion("✅ Ejercicio añadido");
+  renderEjercicios();
 }
 function borrarEjercicio(id){
-  if(db.fuerza.some(x=>x.ejercicioId===id)){alert("No se puede borrar porque ya tiene registros guardados.");return}
-  if(!confirm("¿Borrar este ejercicio?"))return;db.ejercicios=db.ejercicios.filter(e=>e.id!==id);save();vibrar(25);mostrarConfirmacion("Ejercicio borrado.");
+  if(db.fuerza.some(x=>x.ejercicioId===id)){mostrarConfirmacion("No se puede borrar, tiene registros.");return}
+  _mfShow("¿Borrar ejercicio?","Esta acción no se puede deshacer.",null,"Borrar",true,function(ok){
+    if(!ok)return;
+    db.ejercicios=db.ejercicios.filter(e=>e.id!==id);
+    save();guardarDatosNube();vibrar(25);mostrarConfirmacion("Ejercicio borrado.");renderEjercicios();
+  });
 }
 function renderEjercicios(){
-  const torso=document.getElementById("listaTorso"),pierna=document.getElementById("listaPierna");if(!torso||!pierna)return;
-  function pintar(tipo){
-    const arr=db.ejercicios.filter(e=>tipoEjercicio(e)===tipo).sort((a,b)=>a.grupo.localeCompare(b.grupo)||a.nombre.localeCompare(b.nombre));
-    return arr.length?arr.map(e=>`<div class="item"><div class="item-title">${e.nombre}</div><div class="meta">${e.grupo}</div><span class="pill">${tipo}</span>${db.fuerza.some(x=>x.ejercicioId===e.id)?"":`<button type="button" class="red" onclick="borrarEjercicio(${e.id})">Eliminar</button>`}</div>`).join(""):'<div class="empty">Sin ejercicios.</div>';
+  const torso=document.getElementById("listaTorso");
+  const pierna=document.getElementById("listaPierna");
+  if(!torso||!pierna) return;
+
+  function pintarGym(tipo){
+    const arr=db.ejercicios.filter(e=>(!e.categoria||e.categoria==="gym")&&tipoEjercicio(e)===tipo).sort((a,b)=>a.grupo.localeCompare(b.grupo)||a.nombre.localeCompare(b.nombre));
+    return arr.length?arr.map(e=>`<div class="item"><div class="item-title">${e.nombre}</div><div class="meta">${e.grupo}</div>${db.fuerza.some(x=>x.ejercicioId===e.id)?"":`<button type="button" class="red" onclick="borrarEjercicio(${e.id})">Eliminar</button>`}</div>`).join(""):'<div class="empty">Sin ejercicios.</div>';
   }
-  torso.innerHTML=pintar("Torso");pierna.innerHTML=pintar("Pierna");
+
+  function pintarCat(cat){
+    const arr=db.ejercicios.filter(e=>e.categoria===cat).sort((a,b)=>a.nombre.localeCompare(b.nombre));
+    return arr.map(e=>`<div class="item"><div class="item-title">${e.nombre}</div><button type="button" class="red" onclick="borrarEjercicio(${e.id})">Eliminar</button></div>`).join("");
+  }
+
+  torso.innerHTML=pintarGym("Torso");
+  pierna.innerHTML=pintarGym("Pierna");
+
+  ["crossfit","running","cardio"].forEach(function(cat){
+    var lista=document.getElementById("lista"+cat.charAt(0).toUpperCase()+cat.slice(1));
+    var title=document.getElementById("title"+cat.charAt(0).toUpperCase()+cat.slice(1));
+    if(!lista) return;
+    var html=pintarCat(cat);
+    lista.innerHTML=html||'';
+    if(title) title.style.display=html?"block":"none";
+  });
 }
 function guardarRutina(){
   const nombre=document.getElementById("rutinaNombre").value.trim();
@@ -5705,7 +5770,7 @@ function añadirEjercicioCrossfit(){
   var lista = document.getElementById("xEjerciciosLista");
   if(!lista) return;
   var id = "xej_" + (++_xEjCounter);
-  var opts = db.ejercicios.map(function(e){ return '<option>'+e.nombre+'</option>'; }).join("");
+  var opts = crossfitEjercicios.map(function(e){ return '<option>'+e+'</option>'; }).join("");
   var row = document.createElement("div");
   row.className = "crossfit-ej-row";
   row.id = id;
@@ -5899,7 +5964,7 @@ function draw(regs){
 }
 function drawLineChart(ctx,c,data,suffix,color){
   const W=c.width,H=c.height;
-  const padL=58,padR=28,padT=42,padB=70;
+  const padL=68,padR=32,padT=48,padB=72;
 
   const values=data.map(x=>Number(x.v)).filter(v=>isFinite(v));
   const minRaw=Math.min(...values);
@@ -5918,13 +5983,13 @@ function drawLineChart(ctx,c,data,suffix,color){
   ctx.fillStyle=bg;
   ctx.fillRect(0,0,W,H);
 
-  const px=i=>padL+(i/(data.length-1))*(W-padL-padR);
+  const px=i=>padL+(i/(data.length-1||1))*(W-padL-padR);
   const py=v=>H-padB-((v-min)/range)*(H-padT-padB);
 
-  // rejilla horizontal
+  // rejilla horizontal con fuente más grande
   ctx.strokeStyle="#e1e7df";
   ctx.lineWidth=1;
-  ctx.font="12px Arial";
+  ctx.font="bold 22px Arial";
   ctx.fillStyle="#728078";
   ctx.textAlign="right";
 
@@ -5935,12 +6000,12 @@ function drawLineChart(ctx,c,data,suffix,color){
     ctx.moveTo(padL,y);
     ctx.lineTo(W-padR,y);
     ctx.stroke();
-    ctx.fillText((Math.round(val*10)/10)+suffix, padL-8, y+4);
+    ctx.fillText((Math.round(val*10)/10)+suffix, padL-10, y+7);
   }
 
   // línea suavizada
   ctx.strokeStyle=color;
-  ctx.lineWidth=4;
+  ctx.lineWidth=5;
   ctx.lineJoin="round";
   ctx.lineCap="round";
   ctx.beginPath();
@@ -5958,7 +6023,7 @@ function drawLineChart(ctx,c,data,suffix,color){
 
   // relleno suave
   const area=ctx.createLinearGradient(0,padT,0,H-padB);
-  area.addColorStop(0,"rgba(111,143,122,.22)");
+  area.addColorStop(0,"rgba(111,143,122,.2)");
   area.addColorStop(1,"rgba(111,143,122,0)");
   ctx.lineTo(px(data.length-1),H-padB);
   ctx.lineTo(px(0),H-padB);
@@ -5972,31 +6037,32 @@ function drawLineChart(ctx,c,data,suffix,color){
     const prev=i>0?data[i-1]:null;
     const diff=prev?+(d.v-prev.v).toFixed(1):0;
 
+    // punto blanco con borde verde
     ctx.fillStyle="#ffffff";
     ctx.beginPath();
-    ctx.arc(x,y,9,0,Math.PI*2);
+    ctx.arc(x,y,11,0,Math.PI*2);
     ctx.fill();
-
     ctx.strokeStyle=color;
     ctx.lineWidth=4;
     ctx.beginPath();
-    ctx.arc(x,y,7,0,Math.PI*2);
+    ctx.arc(x,y,9,0,Math.PI*2);
     ctx.stroke();
 
-    // mostrar etiqueta solo en primero, último y cambios relevantes
+    // etiqueta del valor encima del punto
     const mostrar = i===0 || i===data.length-1 || Math.abs(diff)>0;
     if(mostrar){
       ctx.fillStyle="#26332f";
-      ctx.font="12px Arial";
+      ctx.font="bold 24px Arial";
       ctx.textAlign="center";
-      ctx.fillText(d.v+suffix,x,y-15);
+      ctx.fillText(d.v+suffix,x,y-18);
     }
 
+    // fecha rotada debajo
     ctx.save();
-    ctx.translate(x,H-42);
-    ctx.rotate(-0.55);
+    ctx.translate(x,H-40);
+    ctx.rotate(-0.5);
     ctx.fillStyle="#728078";
-    ctx.font="12px Arial";
+    ctx.font="18px Arial";
     ctx.textAlign="center";
     ctx.fillText(formatFecha(d.fecha).slice(0,5),0,0);
     ctx.restore();
@@ -6472,11 +6538,9 @@ function mostrarApp(){
     var email = _user.email || '';
     var iniciales = email.substring(0, 2).toUpperCase();
     if(avatar){ 
-      avatar.textContent = iniciales; 
-      avatar.style.display = 'flex'; 
-      avatar.style.alignItems = 'center'; 
-      avatar.style.justifyContent = 'center';
-      avatar.style.setProperty('display', 'flex', 'important');
+      avatar.textContent = iniciales;
+      avatar.style.cssText = 'display:flex!important;align-items:center;justify-content:center;width:34px;height:34px;border-radius:50%;border:none;background:linear-gradient(135deg,#6f8f7a,#9db58e);color:white;font-size:13px;font-weight:850;cursor:pointer;padding:0;margin:0;flex-shrink:0;';
+      avatar.style.setProperty('display','flex','important');
     }
     if(emailLabel) emailLabel.textContent = email;
     // Ocultar botón X antiguo si existe
