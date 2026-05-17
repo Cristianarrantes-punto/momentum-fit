@@ -2879,6 +2879,7 @@ header{
     <button type="button" id="btnEjercicio" data-module="fuerza" onclick="setModoProgreso('ejercicio')">Ejercicio</button>
     <button type="button" id="btnDia" class="off" onclick="setModoProgreso('dia')">Día</button>
     <button type="button" id="btnCuerpo" data-module="medidas" class="off" onclick="setModoProgreso('cuerpo')">Cuerpo</button>
+    <button type="button" id="btnWod" data-module="crossfit" class="off" onclick="setModoProgreso('wod')">WOD</button>
   </div>
 
   <div id="modoEjercicio" data-module="fuerza">
@@ -4350,7 +4351,11 @@ function renderHomeSessionPanel(){
   const s=getActiveSession();
 
   if(!s){
-    cont.innerHTML=""; // nada si no hay sesión activa
+    cont.innerHTML=`
+      <div class="card" style="margin-bottom:10px;padding:14px 16px !important">
+        <button type="button" style="width:100%;padding:14px;border-radius:16px;border:none;background:linear-gradient(135deg,var(--accent),var(--accent2));color:white;font-size:16px;font-weight:850;cursor:pointer;box-shadow:0 6px 18px rgba(79,114,95,.25);margin:0" onclick="abrirTipoEntrenamiento()">💪 Empezar entrenamiento</button>
+      </div>
+    `;
     return;
   }
 
@@ -7438,6 +7443,14 @@ async function iniciarSesion(){
   }
 }
 
+function dbBase(){
+  return {
+    fuerza:[],cardio:[],running:[],crossfit:[],medidas:[],salud:[],
+    ejercicios:JSON.parse(JSON.stringify(db.ejercicios||[])),
+    rutinas:[],sesiones:[],settings:defaultSettings(),objetivos:{}
+  };
+}
+
 async function cargarDatosUsuario(){
   if(!_supabase || !_user) return;
   try {
@@ -7448,16 +7461,32 @@ async function cargarDatosUsuario(){
       .single();
 
     if(data && data.data){
-      var remoteDb = data.data;
-      // Merge with base structure
-      db = Object.assign(JSON.parse(JSON.stringify(db)), remoteDb);
+      // Datos de Supabase — siempre tienen prioridad
+      db = Object.assign(JSON.parse(JSON.stringify(dbBase())), data.data);
+      localStorage.setItem(KEY, JSON.stringify(db));
+      localStorage.setItem('mf_uid', _user.id);
+    } else {
+      // Usuario nuevo sin datos — empezar desde cero
+      var cachedUid = localStorage.getItem('mf_uid');
+      if(cachedUid && cachedUid !== _user.id){
+        // Era otro usuario — limpiar
+        localStorage.removeItem(KEY);
+        localStorage.removeItem('mf_uid');
+      }
+      var local = localStorage.getItem(KEY);
+      if(local) try { db = Object.assign(JSON.parse(JSON.stringify(dbBase())), JSON.parse(local)); } catch(e2){}
+      localStorage.setItem('mf_uid', _user.id);
     }
-    // Also save to localStorage as cache
-    localStorage.setItem(KEY, JSON.stringify(db));
   } catch(e) {
-    // Use localStorage as fallback
-    var local = localStorage.getItem(KEY);
-    if(local) try { db = Object.assign(JSON.parse(JSON.stringify(db)), JSON.parse(local)); } catch(e2){}
+    // Sin conexión — usar localStorage solo si es del mismo usuario
+    var cachedUid = localStorage.getItem('mf_uid');
+    if(cachedUid && cachedUid !== _user.id){
+      localStorage.removeItem(KEY);
+    } else {
+      var local = localStorage.getItem(KEY);
+      if(local) try { db = Object.assign(JSON.parse(JSON.stringify(dbBase())), JSON.parse(local)); } catch(e2){}
+    }
+    localStorage.setItem('mf_uid', _user.id);
   }
 }
 
