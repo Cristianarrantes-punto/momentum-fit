@@ -71,9 +71,9 @@ h1{margin:0;font-size:24px;letter-spacing:-.4px}
 .wrap{padding:14px}
 .screen{display:none}.screen.active{display:block}
 .card{
-  background:var(--card);border:1px solid rgba(105,122,111,.16);
+  background:var(--card);border:1px solid rgba(105,122,111,.09);
   border-radius:22px;padding:15px;margin-bottom:13px;
-  box-shadow:var(--shadow);backdrop-filter:blur(12px);
+  box-shadow:0 2px 12px rgba(74,92,80,.07);backdrop-filter:blur(12px);
 }
 .card.clickable{cursor:pointer}
 .grid .card{
@@ -5208,6 +5208,25 @@ function selEjCategoria(btn){
   document.getElementById('ejCategoria').value = cat;
   var gymFields = document.getElementById('ejGymFields');
   if(gymFields) gymFields.style.display = cat === 'gym' ? 'block' : 'none';
+
+  // Mostrar/ocultar listas según categoría
+  var showGym = cat === 'gym';
+  ['listaTorso','listaPierna'].forEach(function(id){
+    var el=document.getElementById(id); if(el) el.parentElement.style.display=showGym?'block':'none';
+  });
+  // Titles gym
+  document.querySelectorAll('.title').forEach(function(t){
+    if(t.textContent.includes('Gym ·')) t.style.display=showGym?'block':'none';
+  });
+
+  // Mostrar solo la lista de la categoría seleccionada
+  ['crossfit','running','cardio'].forEach(function(c){
+    var lista=document.getElementById('lista'+c.charAt(0).toUpperCase()+c.slice(1));
+    var title=document.getElementById('title'+c.charAt(0).toUpperCase()+c.slice(1));
+    var show = c===cat;
+    if(lista) lista.style.display=show?'block':'none';
+    if(title) title.style.display=show?'block':'none';
+  });
 }
 
 function addEjercicio(){
@@ -5964,19 +5983,18 @@ function draw(regs){
 }
 function drawLineChart(ctx,c,data,suffix,color){
   const W=c.width,H=c.height;
-  const padL=68,padR=32,padT=48,padB=72;
+  const padL=72,padR=36,padT=44,padB=68;
 
   const values=data.map(x=>Number(x.v)).filter(v=>isFinite(v));
   const minRaw=Math.min(...values);
   const maxRaw=Math.max(...values);
-  const padding=(maxRaw-minRaw)*0.18 || Math.max(1,maxRaw*0.08);
+  const padding=(maxRaw-minRaw)*0.2 || Math.max(1,maxRaw*0.1);
   const min=minRaw-padding;
   const max=maxRaw+padding;
   const range=(max-min)||1;
 
   ctx.clearRect(0,0,W,H);
 
-  // fondo
   const bg=ctx.createLinearGradient(0,0,0,H);
   bg.addColorStop(0,"#ffffff");
   bg.addColorStop(1,"#f4f7f2");
@@ -5986,10 +6004,11 @@ function drawLineChart(ctx,c,data,suffix,color){
   const px=i=>padL+(i/(data.length-1||1))*(W-padL-padR);
   const py=v=>H-padB-((v-min)/range)*(H-padT-padB);
 
-  // rejilla horizontal con fuente más grande
-  ctx.strokeStyle="#e1e7df";
+  // rejilla horizontal
+  ctx.strokeStyle="#e8ede6";
   ctx.lineWidth=1;
-  ctx.font="bold 22px Arial";
+  const fontSize=Math.max(16, Math.min(20, W/35));
+  ctx.font=`bold ${fontSize}px -apple-system,Arial`;
   ctx.fillStyle="#728078";
   ctx.textAlign="right";
 
@@ -6000,16 +6019,15 @@ function drawLineChart(ctx,c,data,suffix,color){
     ctx.moveTo(padL,y);
     ctx.lineTo(W-padR,y);
     ctx.stroke();
-    ctx.fillText((Math.round(val*10)/10)+suffix, padL-10, y+7);
+    ctx.fillText((Math.round(val*10)/10)+suffix, padL-8, y+fontSize*0.35);
   }
 
   // línea suavizada
   ctx.strokeStyle=color;
-  ctx.lineWidth=5;
+  ctx.lineWidth=4;
   ctx.lineJoin="round";
   ctx.lineCap="round";
   ctx.beginPath();
-
   data.forEach((d,i)=>{
     const x=px(i), y=py(d.v);
     if(i===0) ctx.moveTo(x,y);
@@ -6021,9 +6039,9 @@ function drawLineChart(ctx,c,data,suffix,color){
   });
   ctx.stroke();
 
-  // relleno suave
+  // relleno
   const area=ctx.createLinearGradient(0,padT,0,H-padB);
-  area.addColorStop(0,"rgba(111,143,122,.2)");
+  area.addColorStop(0,"rgba(111,143,122,.18)");
   area.addColorStop(1,"rgba(111,143,122,0)");
   ctx.lineTo(px(data.length-1),H-padB);
   ctx.lineTo(px(0),H-padB);
@@ -6032,37 +6050,42 @@ function drawLineChart(ctx,c,data,suffix,color){
   ctx.fill();
 
   // puntos y etiquetas
+  const labelSize=Math.max(14,Math.min(18,W/40));
   data.forEach((d,i)=>{
     const x=px(i), y=py(d.v);
     const prev=i>0?data[i-1]:null;
     const diff=prev?+(d.v-prev.v).toFixed(1):0;
 
-    // punto blanco con borde verde
     ctx.fillStyle="#ffffff";
     ctx.beginPath();
-    ctx.arc(x,y,11,0,Math.PI*2);
+    ctx.arc(x,y,10,0,Math.PI*2);
     ctx.fill();
     ctx.strokeStyle=color;
-    ctx.lineWidth=4;
+    ctx.lineWidth=3;
     ctx.beginPath();
-    ctx.arc(x,y,9,0,Math.PI*2);
+    ctx.arc(x,y,8,0,Math.PI*2);
     ctx.stroke();
 
-    // etiqueta del valor encima del punto
-    const mostrar = i===0 || i===data.length-1 || Math.abs(diff)>0;
+    const mostrar=i===0||i===data.length-1||Math.abs(diff)>0;
     if(mostrar){
       ctx.fillStyle="#26332f";
-      ctx.font="bold 24px Arial";
+      ctx.font=`bold ${labelSize}px -apple-system,Arial`;
       ctx.textAlign="center";
-      ctx.fillText(d.v+suffix,x,y-18);
+      const label=d.v+suffix;
+      const labelY=y-16;
+      // fondo blanco para legibilidad
+      const tw=ctx.measureText(label).width;
+      ctx.fillStyle="rgba(255,255,255,.85)";
+      ctx.fillRect(x-tw/2-4,labelY-labelSize,tw+8,labelSize+4);
+      ctx.fillStyle="#26332f";
+      ctx.fillText(label,x,labelY);
     }
 
-    // fecha rotada debajo
     ctx.save();
-    ctx.translate(x,H-40);
-    ctx.rotate(-0.5);
+    ctx.translate(x,H-36);
+    ctx.rotate(-0.45);
     ctx.fillStyle="#728078";
-    ctx.font="18px Arial";
+    ctx.font=`${labelSize-2}px -apple-system,Arial`;
     ctx.textAlign="center";
     ctx.fillText(formatFecha(d.fecha).slice(0,5),0,0);
     ctx.restore();
