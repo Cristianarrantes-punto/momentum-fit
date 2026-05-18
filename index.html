@@ -6457,6 +6457,8 @@ function terminarOnboarding(){
   guardarDatosNube();
   document.getElementById('onboardingScreen').style.display = 'none';
   mostrarApp();
+  // Rellenar campos de configuración atleta con los datos del onboarding
+  setTimeout(function(){ renderDatosAtleta(); }, 100);
   vibrar(20);
 }
 
@@ -6832,8 +6834,11 @@ async function exportarPDF(){
   }
 
   const fecha=new Date().toISOString().slice(0,10);
-  doc.save('momentum-fit-'+fecha+'.pdf');
-  mostrarConfirmacion('PDF descargado');
+  // iOS Safari no permite descargas directas — abrir en nueva pestaña
+  const pdfBlob = doc.output('blob');
+  const pdfUrl = URL.createObjectURL(pdfBlob);
+  window.open(pdfUrl, '_blank');
+  mostrarConfirmacion('PDF generado — pulsa compartir para guardarlo');
 }
 
 /* ===== SUPABASE AUTH FUNCTIONS ===== */
