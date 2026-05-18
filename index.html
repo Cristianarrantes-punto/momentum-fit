@@ -2495,7 +2495,7 @@ header{
     <div style="display:flex;gap:8px;align-items:center;position:relative">
       <button type="button" id="pwaInstallBtn" onclick="instalarPWA()" style="display:none;margin:0;padding:8px 14px;font-size:13px;font-weight:700;border-radius:20px;background:rgba(111,143,122,.15);color:var(--accent);border:1px solid rgba(111,143,122,.3);box-shadow:none;width:auto;align-items:center">⬇️ Instalar</button>
       <button type="button" class="quick-add" onclick="abrirRegistroRapido()">+ Serie</button>
-      <button type="button" id="userAvatarBtn" onclick="toggleUserMenu()" style="display:none;width:34px;height:34px;border-radius:50%;border:2px solid rgba(255,255,255,.3);background:linear-gradient(135deg,var(--accent),var(--accent2));color:white;font-size:13px;font-weight:850;cursor:pointer;padding:0;margin:0;flex-shrink:0;align-items:center;justify-content:center">CR</button>
+      <button type="button" id="userAvatarBtn" onclick="toggleUserMenu()" style="width:34px;height:34px;border-radius:50%;border:none;background:linear-gradient(135deg,#6f8f7a,#9db58e);color:white;font-size:13px;font-weight:850;cursor:pointer;padding:0;margin:0;flex-shrink:0;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 8px rgba(74,92,80,.25)">👤</button>
       <!-- Mini menú -->
       <div id="userMenu" style="display:none;position:absolute;top:44px;right:0;background:white;border:1px solid rgba(111,143,122,.2);border-radius:16px;box-shadow:0 8px 28px rgba(38,51,47,.16);min-width:180px;z-index:500;overflow:hidden">
         <div id="userMenuEmail" style="padding:12px 16px;font-size:12px;color:var(--muted);border-bottom:1px solid rgba(111,143,122,.1);font-weight:600"></div>
@@ -3275,39 +3275,13 @@ const base=[
 ["Sentadilla","Pierna","Pierna"],["Prensa","Pierna","Pierna"],["Extensión cuádriceps","Pierna","Pierna"],["Curl femoral","Pierna","Pierna"],["Hip thrust","Glúteo","Pierna"],["Gemelos","Pierna","Pierna"]
 ];
 
-let db=JSON.parse(localStorage.getItem(KEY)||"null");
-if(!db){
-  db={
-    ejercicios:base.map((x,i)=>({id:Date.now()+i,nombre:x[0],grupo:x[1],tipo:x[2]})),
-    fuerza:[],sesiones:[],cardio:[],running:[],crossfit:[],medidas:[],salud:[],rutinas:[],objetivos:{},lastBackup:"",settings:defaultSettings(),athlete:defaultAthlete()
-  };
-  localStorage.setItem(KEY,JSON.stringify(db));
-}else{
-  db.ejercicios=db.ejercicios||[];
-  db.settings=db.settings||defaultSettings();
-  db.athlete=db.athlete||defaultAthlete();
-  db.fuerza=db.fuerza||[];
-  db.sesiones=db.sesiones||[];
-  db.cardio=db.cardio||[];
-  db.medidas=db.medidas||[];
-  db.salud=db.salud||[];
-  db.running=db.running||[];
-  db.crossfit=db.crossfit||[];
-  db.rutinas=db.rutinas||[];
-  db.objetivos=db.objetivos||{};
-  db.objetivosLista=db.objetivosLista||[];
-  if(db.objetivos.principal && !db.objetivosLista.length){
-    db.objetivosLista.push({...db.objetivos, id:Date.now()});
-  }
-  db.lastBackup=db.lastBackup||"";
-  db.ejercicios.forEach(e=>{if(!e.tipo)e.tipo=["Pierna","Glúteo"].includes(e.grupo)?"Pierna":"Torso"});
-  base.forEach((x,i)=>{
-    if(!db.ejercicios.some(e=>e.nombre.toLowerCase()===x[0].toLowerCase())){
-      db.ejercicios.push({id:Date.now()+i+500,nombre:x[0],grupo:x[1],tipo:x[2]});
-    }
-  });
-  localStorage.setItem(KEY,JSON.stringify(db));
-}
+let db={
+  ejercicios:base.map((x,i)=>({id:Date.now()+i,nombre:x[0],grupo:x[1],tipo:x[2]})),
+  fuerza:[],sesiones:[],cardio:[],running:[],crossfit:[],medidas:[],salud:[],
+  rutinas:[],objetivos:{},objetivosLista:[],lastBackup:"",
+  settings:defaultSettings(),athlete:defaultAthlete()
+};
+
 
 function today(){return new Date().toISOString().slice(0,10)}
 
@@ -6606,20 +6580,12 @@ function mostrarApp(){
 
   // Mostrar avatar con iniciales
   if(_user){
-    var avatar = document.getElementById('userAvatarBtn');
-    var emailLabel = document.getElementById('userMenuEmail');
     var email = _user.email || '';
     var iniciales = email.substring(0, 2).toUpperCase();
-    if(avatar){ 
-      avatar.textContent = iniciales;
-      avatar.style.cssText = 'display:flex!important;align-items:center;justify-content:center;width:34px;height:34px;border-radius:50%;border:none;background:linear-gradient(135deg,#6f8f7a,#9db58e);color:white;font-size:13px;font-weight:850;cursor:pointer;padding:0;margin:0;flex-shrink:0;';
-      avatar.style.setProperty('display','flex','important');
-    }
+    var avatar = document.getElementById('userAvatarBtn');
+    if(avatar) avatar.textContent = iniciales;
+    var emailLabel = document.getElementById('userMenuEmail');
     if(emailLabel) emailLabel.textContent = email;
-    // Ocultar botón X antiguo si existe
-    var xBtn = document.getElementById('btnCerrarSesion');
-    if(xBtn) xBtn.style.display = 'none';
-    // Email en config
     var confEmail = document.getElementById('userEmailLabel');
     if(confEmail) confEmail.textContent = email;
   }
@@ -7445,9 +7411,10 @@ async function iniciarSesion(){
 
 function dbBase(){
   return {
-    fuerza:[],cardio:[],running:[],crossfit:[],medidas:[],salud:[],
-    ejercicios:JSON.parse(JSON.stringify(db.ejercicios||[])),
-    rutinas:[],sesiones:[],settings:defaultSettings(),objetivos:{}
+    ejercicios:base.map((x,i)=>({id:Date.now()+i,nombre:x[0],grupo:x[1],tipo:x[2]})),
+    fuerza:[],sesiones:[],cardio:[],running:[],crossfit:[],medidas:[],salud:[],
+    rutinas:[],objetivos:{},objetivosLista:[],lastBackup:"",
+    settings:defaultSettings(),athlete:defaultAthlete()
   };
 }
 
