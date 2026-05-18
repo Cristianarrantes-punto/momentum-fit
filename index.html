@@ -36,14 +36,14 @@ body{
   padding-bottom:30px;
 }
 header{
-  padding:12px 15px 8px;
+  padding:14px 15px 10px;
   position:sticky;top:0;z-index:10;
   background:rgba(246,243,236,.92);
   backdrop-filter:blur(14px);
   border-bottom:1px solid rgba(105,122,111,.16);
 }
-h1{margin:0;font-size:18px;letter-spacing:-.4px;white-space:nowrap;}
-.sub{color:var(--muted);font-size:11px;margin-top:2px}
+h1{margin:0;font-size:20px;letter-spacing:-.4px;white-space:nowrap;}
+.sub{color:var(--muted);font-size:12px;margin-top:3px}
 .topbar{display:flex;align-items:center;justify-content:space-between;gap:12px}
 .quick-add{
   width:auto;min-width:90px;margin:0;padding:9px 12px;border-radius:999px;
@@ -3563,6 +3563,7 @@ function guardarDatosAtleta(){
   db.athlete.sexo=document.getElementById("athSexo")?.value || "hombre";
   db.athlete.altura=document.getElementById("athAltura")?.value ? Number(document.getElementById("athAltura").value) : "";
   localStorage.setItem(KEY,JSON.stringify(db));
+  guardarDatosNube();
   renderTituloAtleta();
   rellenarMedidasPrevias();
   mostrarConfirmacion("✓ Datos del atleta guardados");
@@ -3641,11 +3642,9 @@ function renderTituloAtleta(){
   const title=document.getElementById("appTitle");
   const sub=document.getElementById("appSubtitle");
   if(title){
-    title.innerHTML = nombre
-      ? `<span class="brand-mark">MOMENTUM</span> <span class="brand-fit">FIT</span> <span class="brand-user">· ${nombre}</span>`
-      : `<span class="brand-mark">MOMENTUM</span> <span class="brand-fit">FIT</span>`;
+    title.innerHTML=`<span class="brand-mark">MOMENTUM</span> <span class="brand-fit">FIT</span>`;
   }
-  if(sub) sub.textContent="Every day counts";
+  if(sub) sub.textContent=nombre ? "Hola, "+nombre+" 👋" : "Every day counts";
 }
 
 
@@ -6558,7 +6557,6 @@ document.addEventListener('click', function(e){
 async function exportarPDF(){
   mostrarConfirmacion('Generando PDF...');
 
-  // Load jsPDF
   if(!window.jspdf){
     await new Promise(function(resolve,reject){
       var s=document.createElement('script');
@@ -6570,1267 +6568,274 @@ async function exportarPDF(){
 
   const { jsPDF } = window.jspdf;
   const doc = new jsPDF({ orientation:'portrait', unit:'mm', format:'a4' });
-  const W = 210, margin = 14;
-  let y = margin;
+  const W=210, H=297, margin=16, contentW=W-margin*2;
+  let y=0;
 
-  // Helper
-  function addTitle(text, size, color){
-    doc.setFontSize(size||14);
-    doc.setTextColor(color||'#26332f');
-    doc.setFont('helvetica','bold');
-    doc.text(text, margin, y);
-    y += size ? size*0.5 : 8;
-  }
-  function addText(text, size){
-    doc.setFontSize(size||10);
-    doc.setTextColor('#728078');
-    doc.setFont('helvetica','normal');
-    doc.text(text, margin, y);
-    y += 6;
-  }
-  function addLine(){
-    doc.setDrawColor('#e8ede6');
-    doc.line(margin, y, W-margin, y);
-    y += 4;
+  const GREEN='#4a7a5c', GREEN_LIGHT='#e8f0eb', DARK='#1a2e23', MUTED='#6b7e72', LIGHT='#f5f7f5';
+
+  function newPage(){
+    doc.addPage();
+    y = margin;
   }
   function checkPage(needed){
-    if(y + needed > 280){ doc.addPage(); y = margin; }
+    if(y + needed > H-20){ newPage(); }
   }
 
-  // CABECERA
-  doc.setFillColor('#6f8f7a');
-  doc.roundedRect(margin, y, W-margin*2, 18, 3, 3, 'F');
+  // ══════════════════════════════════
+  // PORTADA
+  // ══════════════════════════════════
+  // Fondo superior verde
+  doc.setFillColor(GREEN);
+  doc.rect(0, 0, W, 80, 'F');
+
+  // Franja decorativa
+  doc.setFillColor('#3d6b4f');
+  doc.rect(0, 70, W, 10, 'F');
+
+  // Título principal
   doc.setTextColor('#ffffff');
-  doc.setFontSize(16);
+  doc.setFontSize(28);
   doc.setFont('helvetica','bold');
-  doc.text('MOMENTUM FIT — Informe de Progreso', margin+4, y+12);
-  y += 24;
+  doc.text('MOMENTUM FIT', margin, 32);
+
+  doc.setFontSize(13);
+  doc.setFont('helvetica','normal');
+  doc.setTextColor('rgba(255,255,255,0.85)');
+  doc.text('Informe de Progreso Personal', margin, 44);
+
+  // Nombre usuario
+  const nombreAtleta = (db.athlete?.nombre || '').trim();
+  if(nombreAtleta){
+    doc.setFontSize(16);
+    doc.setFont('helvetica','bold');
+    doc.setTextColor('#ffffff');
+    doc.text(nombreAtleta, margin, 58);
+  }
 
   // Fecha
-  doc.setTextColor('#728078');
-  doc.setFontSize(9);
+  doc.setFontSize(10);
   doc.setFont('helvetica','normal');
-  doc.text('Generado el ' + new Date().toLocaleDateString('es-ES', {day:'2-digit',month:'long',year:'numeric'}), margin, y);
-  y += 8;
-  addLine();
+  doc.setTextColor('rgba(255,255,255,0.7)');
+  doc.text(new Date().toLocaleDateString('es-ES',{day:'2-digit',month:'long',year:'numeric'}), margin, 68);
 
-  // RESUMEN GENERAL
+  y = 92;
+
+  // ══════════════════════════════════
+  // RESUMEN EN TARJETAS
+  // ══════════════════════════════════
   const all = entrenosAll();
   const anio = new Date().getFullYear().toString();
   const diasAnio = [...new Set(all.filter(x=>x.fecha.startsWith(anio)).map(x=>x.fecha))].length;
   const diasMes = [...new Set(all.filter(x=>x.fecha.slice(0,7)===mesActualKey()).map(x=>x.fecha))].length;
+  const inicioSem = inicioSemana();
+  const finSem = new Date(inicioSem); finSem.setDate(inicioSem.getDate()+7);
+  const diasSem = [...new Set(all.filter(x=>{const d=new Date(x.fecha);return d>=inicioSem&&d<finSem;}).map(x=>x.fecha))].length;
   const totalSeries = db.fuerza.length;
-  const mejorMarca = db.fuerza.length ? db.fuerza.reduce((best,r)=>Number(r.kg||0)>Number(best.kg||0)?r:best,db.fuerza[0]) : null;
+  const mejorMarca = db.fuerza.length ? db.fuerza.reduce((b,r)=>Number(r.kg||0)>Number(b.kg||0)?r:b,db.fuerza[0]) : null;
 
-  checkPage(40);
-  addTitle('Resumen general', 13);
-  y += 2;
+  // Título sección
+  doc.setFontSize(13);
+  doc.setFont('helvetica','bold');
+  doc.setTextColor(DARK);
+  doc.text('RESUMEN GENERAL', margin, y);
+  doc.setDrawColor(GREEN);
+  doc.setLineWidth(0.8);
+  doc.line(margin, y+2, margin+40, y+2);
+  y += 10;
 
-  // Grid de stats
+  // 4 tarjetas en fila
+  const cardW = (contentW-6)/4;
   const stats = [
-    ['Días entrenados (año)', diasAnio],
-    ['Días entrenados (mes)', diasMes],
-    ['Series totales registradas', totalSeries],
-    ['Ejercicios en biblioteca', db.ejercicios.length],
+    {label:'Esta semana', val:diasSem, unit:'dias'},
+    {label:'Este mes', val:diasMes, unit:'dias'},
+    {label:'Este año', val:diasAnio, unit:'dias'},
+    {label:'Series totales', val:totalSeries, unit:''},
   ];
-  stats.forEach(function(s){
-    doc.setFontSize(10);
-    doc.setTextColor('#26332f');
+  stats.forEach(function(s,i){
+    const cx = margin + i*(cardW+2);
+    doc.setFillColor(GREEN_LIGHT);
+    doc.roundedRect(cx, y, cardW, 22, 2, 2, 'F');
+    doc.setFillColor(GREEN);
+    doc.roundedRect(cx, y, cardW, 5, 2, 2, 'F');
+    doc.setFontSize(18);
     doc.setFont('helvetica','bold');
-    doc.text(String(s[1]), margin+2, y);
+    doc.setTextColor(DARK);
+    doc.text(String(s.val), cx+cardW/2, y+15, {align:'center'});
+    doc.setFontSize(7.5);
     doc.setFont('helvetica','normal');
-    doc.setTextColor('#728078');
-    doc.text(s[0], margin+14, y);
-    y += 6;
+    doc.setTextColor(MUTED);
+    doc.text(s.label, cx+cardW/2, y+20, {align:'center'});
   });
+  y += 28;
 
+  // Mejor marca
   if(mejorMarca){
-    y += 2;
-    doc.setFontSize(10);
-    doc.setTextColor('#6f8f7a');
+    doc.setFillColor('#fff8e8');
+    doc.roundedRect(margin, y, contentW, 10, 2, 2, 'F');
+    doc.setDrawColor('#d4a853');
+    doc.setLineWidth(0.4);
+    doc.roundedRect(margin, y, contentW, 10, 2, 2, 'S');
+    doc.setFontSize(9);
     doc.setFont('helvetica','bold');
-    doc.text('🏆 Mejor marca: ' + mejorMarca.ejercicio + ' — ' + mejorMarca.kg + ' kg × ' + mejorMarca.reps + ' reps', margin, y);
-    y += 8;
+    doc.setTextColor('#8a6a2a');
+    doc.text('MEJOR MARCA ABSOLUTA', margin+4, y+4.5);
+    doc.setFont('helvetica','normal');
+    doc.text(mejorMarca.ejercicio + '   ' + mejorMarca.kg + ' kg x ' + mejorMarca.reps + ' reps', margin+4, y+8.5);
+    y += 15;
   }
-  addLine();
 
-  // GRÁFICAS POR EJERCICIO (top 5 con más registros)
-  checkPage(20);
-  addTitle('Evolución por ejercicio', 13);
-  y += 2;
-
+  // ══════════════════════════════════
+  // GRAFICAS POR EJERCICIO
+  // ══════════════════════════════════
   const ejsConDatos = [...new Set(db.fuerza.map(r=>r.ejercicio))].map(function(nombre){
     const regs = db.fuerza.filter(x=>x.ejercicio===nombre);
     return {nombre, count:regs.length, regs};
-  }).sort((a,b)=>b.count-a.count);
+  }).filter(e=>e.count>=2).sort((a,b)=>b.count-a.count);
+
+  const ejsSinGrafica = [...new Set(db.fuerza.map(r=>r.ejercicio))].map(function(nombre){
+    const regs = db.fuerza.filter(x=>x.ejercicio===nombre);
+    return {nombre, count:regs.length, regs};
+  }).filter(e=>e.count<2).sort((a,b)=>b.count-a.count);
+
+  if(ejsConDatos.length || ejsSinGrafica.length){
+    checkPage(20);
+    doc.setFontSize(13);
+    doc.setFont('helvetica','bold');
+    doc.setTextColor(DARK);
+    doc.text('EVOLUCION POR EJERCICIO', margin, y);
+    doc.setDrawColor(GREEN);
+    doc.setLineWidth(0.8);
+    doc.line(margin, y+2, margin+55, y+2);
+    y += 10;
+  }
 
   for(const ej of ejsConDatos){
-    checkPage(55);
+    const chartH_mm = 42;
+    checkPage(chartH_mm + 18);
 
-    // Título ejercicio
-    doc.setFontSize(11);
-    doc.setTextColor('#26332f');
+    // Cabecera ejercicio
+    doc.setFillColor(DARK);
+    doc.roundedRect(margin, y, contentW, 8, 1, 1, 'F');
+    doc.setFontSize(10);
     doc.setFont('helvetica','bold');
-    doc.text(ej.nombre, margin, y);
+    doc.setTextColor('#ffffff');
+    doc.text(ej.nombre.toUpperCase(), margin+3, y+5.5);
 
-    const regs = ej.regs;
-    const best = regs.reduce((b,r)=>Number(r.kg||0)>Number(b.kg||0)?r:b,regs[0]);
-    const last = [...regs].sort((a,b)=>b.id-a.id)[0];
-    doc.setFontSize(9);
-    doc.setTextColor('#728078');
+    const best = ej.regs.reduce((b,r)=>Number(r.kg||0)>Number(b.kg||0)?r:b,ej.regs[0]);
+    const last = [...ej.regs].sort((a,b)=>b.id-a.id)[0];
+    doc.setFontSize(8);
     doc.setFont('helvetica','normal');
-    doc.text('Mejor: '+best.kg+'kg  |  Última: '+last.kg+'kg  |  '+regs.length+' series', margin+80, y);
-    y += 6;
+    doc.text('Max: '+best.kg+'kg   Ultimo: '+last.kg+'kg   '+ej.count+' series', W-margin-3, y+5.5, {align:'right'});
+    y += 10;
 
-    // Mini gráfica canvas
-    const c = document.createElement('canvas');
-    c.width = 700; c.height = 200;
-    const ctx = c.getContext('2d');
-
-    // Agrupar por fecha — max kg por día
-    const porFecha = {};
-    regs.forEach(function(r){
+    // Gráfica
+    const porFecha={};
+    ej.regs.forEach(function(r){
       if(!porFecha[r.fecha]||Number(r.kg||0)>porFecha[r.fecha]) porFecha[r.fecha]=Number(r.kg||0);
     });
-    const data = Object.keys(porFecha).sort().map(function(f){ return {fecha:f,v:porFecha[f]}; });
+    const data=Object.keys(porFecha).sort().map(function(f){return {fecha:f,v:porFecha[f]};});
 
-    if(data.length >= 2){
-      drawLineChart(ctx, c, data, 'kg', '#6f8f7a');
-      const imgData = c.toDataURL('image/png');
-      const chartW = W - margin*2;
-      const chartH = chartW * (200/700);
-      doc.addImage(imgData, 'PNG', margin, y, chartW, chartH);
-      y += chartH + 4;
-    } else {
-      addText('  (Pocos datos para generar gráfica)', 9);
-    }
-    y += 4;
+    const c=document.createElement('canvas');
+    c.width=900; c.height=280;
+    const ctx=c.getContext('2d');
+    drawLineChart(ctx,c,data,'kg','#4a7a5c');
+    const imgData=c.toDataURL('image/png');
+    doc.addImage(imgData,'PNG',margin,y,contentW,chartH_mm);
+    y += chartH_mm + 8;
   }
 
+  // Ejercicios sin suficientes datos — tabla compacta
+  if(ejsSinGrafica.length){
+    checkPage(20);
+    doc.setFontSize(10);
+    doc.setFont('helvetica','bold');
+    doc.setTextColor(MUTED);
+    doc.text('Ejercicios con pocos registros', margin, y);
+    y += 6;
+    ejsSinGrafica.forEach(function(ej){
+      checkPage(8);
+      const best=ej.regs.reduce((b,r)=>Number(r.kg||0)>Number(b.kg||0)?r:b,ej.regs[0]);
+      doc.setFillColor(LIGHT);
+      doc.roundedRect(margin,y,contentW,6,1,1,'F');
+      doc.setFontSize(8.5);
+      doc.setFont('helvetica','bold');
+      doc.setTextColor(DARK);
+      doc.text(ej.nombre, margin+3, y+4.2);
+      doc.setFont('helvetica','normal');
+      doc.setTextColor(MUTED);
+      doc.text(best.kg+'kg x '+best.reps+'reps  |  '+ej.count+' serie'+(ej.count>1?'s':''), W-margin-3, y+4.2, {align:'right'});
+      y += 7.5;
+    });
+  }
+
+  // ══════════════════════════════════
   // OBJETIVOS
+  // ══════════════════════════════════
   if(db.objetivos && (db.objetivos.fuerza || db.objetivos.dias || db.objetivos.alcohol)){
     checkPage(30);
-    addLine();
-    addTitle('Objetivos', 13);
-    y += 2;
+    y += 6;
+    doc.setFontSize(13);
+    doc.setFont('helvetica','bold');
+    doc.setTextColor(DARK);
+    doc.text('OBJETIVOS', margin, y);
+    doc.setDrawColor(GREEN);
+    doc.setLineWidth(0.8);
+    doc.line(margin, y+2, margin+28, y+2);
+    y += 10;
 
+    const objs = [];
     if(db.objetivos.fuerza){
-      const of = db.objetivos.fuerza;
-      const regs = db.fuerza.filter(x=>x.ejercicio===of.ejercicio);
-      const best = regs.length ? Math.max(...regs.map(x=>Number(x.kg)||0)) : of.actual||0;
-      const pct = of.meta>of.actual ? Math.min(100,Math.round(((best-of.actual)/(of.meta-of.actual))*100)) : 100;
-      addText('🏋️ Marca en ' + of.ejercicio + ': ' + best + 'kg de ' + of.meta + 'kg (' + pct + '%)', 10);
+      const of=db.objetivos.fuerza;
+      const regs=db.fuerza.filter(x=>x.ejercicio===of.ejercicio);
+      const best=regs.length?Math.max(...regs.map(x=>Number(x.kg)||0)):(of.actual||0);
+      const pct=of.meta>of.actual?Math.min(100,Math.round(((best-of.actual)/(of.meta-of.actual))*100)):100;
+      objs.push({label:'Marca en '+of.ejercicio, val:best+'kg de '+of.meta+'kg', pct});
     }
-    if(db.objetivos.dias){
-      addText('📅 Días/semana: objetivo ' + db.objetivos.dias.meta + ' días', 10);
-    }
-    if(db.objetivos.alcohol){
-      addText('🍺 Alcohol: máximo ' + db.objetivos.alcohol.max + ' consumiciones/semana', 10);
-    }
-  }
+    if(db.objetivos.dias) objs.push({label:'Dias por semana', val:'Objetivo: '+db.objetivos.dias.meta+' dias', pct:null});
+    if(db.objetivos.alcohol) objs.push({label:'Control alcohol', val:'Max. '+db.objetivos.alcohol.max+' consumiciones/semana', pct:null});
 
-  // PIE DE PÁGINA
-  doc.setFontSize(8);
-  doc.setTextColor('#aaa');
-  doc.text('Generado con Momentum Fit — momentum-fit-app.netlify.app', margin, 290);
-
-  // GUARDAR
-  const fecha = new Date().toISOString().slice(0,10);
-  doc.save('momentum-fit-progreso-' + fecha + '.pdf');
-  mostrarConfirmacion('✅ PDF descargado');
-}
-function cerrarNotif(){
-  document.getElementById('notifBanner').style.display='none';
-}
-function mostrarNotif(icon,title,sub){
-  document.getElementById('notifIcon').textContent=icon;
-  document.getElementById('notifTitle').textContent=title;
-  document.getElementById('notifSub').textContent=sub;
-  document.getElementById('notifBanner').style.display='flex';
-  clearTimeout(window._notifTimer);
-  window._notifTimer=setTimeout(cerrarNotif,6000);
-}
-function checkNotificaciones(){
-  var all=entrenosAll?entrenosAll():[];
-  if(!all||!all.length) return;
-  var ultimo=all[0];
-  if(!ultimo) return;
-  var hoy=new Date();
-  var fechaUltimo=new Date(ultimo.fecha);
-  var diasSin=Math.floor((hoy-fechaUltimo)/(1000*60*60*24));
-  var hoyStr=today();
-  if(localStorage.getItem('mf_notif_date')===hoyStr) return;
-  var notif=null;
-  if(diasSin>=7){
-    notif={icon:'🔥',title:'¡Llevas '+diasSin+' días sin entrenar!',sub:'Tu racha te está esperando. Hoy puede ser el día.'};
-  } else if(diasSin>=3){
-    notif={icon:'💪',title:diasSin+' días desde tu último entreno',sub:'Un poco de movimiento marca la diferencia.'};
-  } else if(diasSin===0 && Math.random()<0.3){
-    notif={icon:'🏆',title:'¡Entrenaste hoy!',sub:'Constancia es lo que te llevará donde quieres.'};
-  }
-  if(notif){
-    localStorage.setItem('mf_notif_date',hoyStr);
-    setTimeout(function(){ mostrarNotif(notif.icon,notif.title,notif.sub); },2000);
-  }
-}
-
-function mostrarApp(){
-  document.getElementById('loginScreen').style.display = 'none';
-  document.getElementById('onboardingScreen').style.display = 'none';
-
-  // Mostrar avatar con iniciales
-  if(_user){
-    var email = _user.email || '';
-    var iniciales = email.substring(0, 2).toUpperCase();
-    var avatar = document.getElementById('userAvatarBtn');
-    if(avatar) avatar.textContent = iniciales;
-    var emailLabel = document.getElementById('userMenuEmail');
-    if(emailLabel) emailLabel.textContent = email;
-    var confEmail = document.getElementById('userEmailLabel');
-    if(confEmail) confEmail.textContent = email;
-  }
-
-  renderAll();
-  renderInicioObjetivos();
-  checkNotificaciones();
-}
-
-function registrarAlcoholHoy(delta){
-  db.salud=db.salud||[];
-  var t=today();
-  var reg=db.salud.find(function(s){return s.fecha===t;});
-  if(reg){ reg.alcohol=Math.max(0,(Number(reg.alcohol)||0)+delta); }
-  else{ if(delta<=0)return; db.salud.push({id:Date.now(),fecha:t,sueno:'',pasos:'',alcohol:delta,energia:''}); }
-  localStorage.setItem(KEY,JSON.stringify(db));
-  renderInicioObjetivos();
-  mostrarConfirmacion(delta>0?'+1 consumición':'-1 consumición');
-  vibrar(15);
-}
-
-function renderInicioObjetivos(){
-  var cont=document.getElementById('inicioObjetivos');
-  if(!cont)return;
-  db.objetivos=db.objetivos||{};
-  var cards='';
-
-  if(db.objetivos.fuerza){
-    var of=db.objetivos.fuerza;
-    var regs=db.fuerza.filter(function(x){return x.ejercicio===of.ejercicio;});
-    var best=regs.length?Math.max.apply(null,regs.map(function(x){return Number(x.kg)||0;})):(of.actual||0);
-    var pct=of.meta>of.actual?Math.min(100,Math.round(((best-of.actual)/(of.meta-of.actual))*100)):100;
-    pct=Math.max(0,pct);
-    var estado=pct>=100?'green':pct>=50?'yellow':'red';
-    var estadoTxt=pct>=100?'¡Conseguido!':pct>=50?'En progreso':'Empezando';
-    cards+='<div class="obj-card">'+
-      '<div class="obj-card-head"><span class="obj-card-titulo">🏋️ '+of.ejercicio+'</span><span class="obj-card-estado '+estado+'">'+estadoTxt+'</span></div>'+
-      '<div class="obj-card-meta">Actual: <b>'+best+' kg</b> · Meta: <b>'+of.meta+' kg</b></div>'+
-      '<div class="obj-barra-wrap"><div class="obj-barra" style="width:'+pct+'%"></div></div>'+
-      '<div class="obj-pct">'+pct+'% completado · se actualiza con tus registros</div>'+
-      '</div>';
-  }
-
-  if(db.objetivos.dias){
-    var od=db.objetivos.dias;
-    var inicioSem=inicioSemana();
-    var finSem=new Date(inicioSem); finSem.setDate(inicioSem.getDate()+7);
-    var diasEsta=new Set([].concat(
-      db.fuerza.map(function(x){return x.fecha;}),
-      db.cardio.map(function(x){return x.fecha;}),
-      (db.running||[]).map(function(x){return x.fecha;}),
-      (db.crossfit||[]).map(function(x){return x.fecha;})
-    ).filter(function(f){var d=new Date(f);return d>=inicioSem&&d<finSem;})).size;
-    var dpct=Math.min(100,Math.round((diasEsta/od.meta)*100));
-    var destado=diasEsta>=od.meta?'green':diasEsta>=Math.ceil(od.meta/2)?'yellow':'red';
-    var destadoTxt=diasEsta>=od.meta?'¡Semana completada!':diasEsta+' de '+od.meta+' días';
-    cards+='<div class="obj-card">'+
-      '<div class="obj-card-head"><span class="obj-card-titulo">📅 Entrenar '+od.meta+' días/semana</span><span class="obj-card-estado '+destado+'">'+destadoTxt+'</span></div>'+
-      '<div class="obj-card-meta">Esta semana: <b>'+diasEsta+' día'+(diasEsta===1?'':'s')+'</b> · se actualiza con tus entrenos</div>'+
-      '<div class="obj-barra-wrap"><div class="obj-barra" style="width:'+dpct+'%"></div></div>'+
-      '<div class="obj-pct">'+dpct+'% de la semana</div>'+
-      '</div>';
-  }
-
-  if(db.objetivos.alcohol!==undefined){
-    var oa=db.objetivos.alcohol;
-    var inicioSemA=inicioSemana();
-    var finSemA=new Date(inicioSemA); finSemA.setDate(inicioSemA.getDate()+7);
-    var alcoholSem=(db.salud||[]).filter(function(s){var d=new Date(s.fecha);return d>=inicioSemA&&d<finSemA;}).reduce(function(sum,s){return sum+(Number(s.alcohol)||0);},0);
-    var t2=today();
-    var regHoy=(db.salud||[]).find(function(s){return s.fecha===t2;});
-    var alcoholHoy=regHoy?Number(regHoy.alcohol)||0:0;
-    var aestado,aestadoTxt;
-    if(oa.max===0){
-      aestado=alcoholSem===0?'green':'red';
-      aestadoTxt=alcoholSem===0?'¡Sin alcohol esta semana!':alcoholSem+' consumición'+(alcoholSem===1?'':'es');
-    }else{
-      aestado=alcoholSem<=oa.max?(alcoholSem/oa.max<=0.7?'green':'yellow'):'red';
-      aestadoTxt=alcoholSem<=oa.max?'Dentro del límite':'Límite superado';
-    }
-    var quedan=Math.max(0,oa.max-alcoholSem);
-    cards+='<div class="obj-card">'+
-      '<div class="obj-card-head"><span class="obj-card-titulo">🍺 Máx. '+oa.max+' por semana</span><span class="obj-card-estado '+aestado+'">'+aestadoTxt+'</span></div>'+
-      '<div class="obj-card-meta">Esta semana: <b>'+alcoholSem+'</b> consumición'+(alcoholSem===1?'':'es')+(oa.max>0?' · Te quedan <b>'+quedan+'</b>':'')+' </div>'+
-      (oa.max>0?'<div class="obj-barra-wrap"><div class="obj-barra" style="width:'+Math.min(100,Math.round((alcoholSem/oa.max)*100))+'%;background:linear-gradient(135deg,'+(alcoholSem>oa.max?'#b76e63,#d79b8f':'var(--accent),var(--accent2)')+')"></div></div>':'')+
-      '<div class="obj-registro-row">'+
-        '<span class="obj-registro-label">Hoy: <b>'+alcoholHoy+'</b></span>'+
-        '<div class="obj-counter">'+
-          '<button type="button" class="obj-counter-btn" onclick="registrarAlcoholHoy(-1)">−</button>'+
-          '<span class="obj-counter-val">'+alcoholHoy+'</span>'+
-          '<button type="button" class="obj-counter-btn plus" onclick="registrarAlcoholHoy(1)">+</button>'+
-        '</div>'+
-      '</div>'+
-      '</div>';
-  }
-
-  if(!cards){
-    cont.innerHTML='<div class="empty" style="margin-bottom:14px">Define tus objetivos en la pestaña <b>Objetivos</b>.</div>';
-  }else{
-    cont.innerHTML=cards;
-  }
-}
-
-function renderObjetivos(){
-  // Sync exercise selector in objetivos screen
-  var sel = document.getElementById('objFuerzaEjercicio');
-  if(!sel) return;
-  var nombres = [...new Set(db.ejercicios.map(function(e){ return e.nombre; }))].sort();
-  var current = sel.value;
-  sel.innerHTML = '<option value="">Seleccionar ejercicio</option>' +
-    nombres.map(function(n){ return '<option value="'+n+'">'+n+'</option>'; }).join('');
-  if(current) sel.value = current;
-
-  // Restore saved objetivo values
-  if(db.objetivos && db.objetivos.fuerza){
-    var of = db.objetivos.fuerza;
-    if(of.ejercicio) sel.value = of.ejercicio;
-    if(of.actual) document.getElementById('objFuerzaActual').value = of.actual;
-    if(of.meta) document.getElementById('objFuerzaMeta').value = of.meta;
-  }
-  if(db.objetivos && db.objetivos.dias){
-    var dBtn = document.querySelector('.obj-dia-btn[data-val="'+db.objetivos.dias.meta+'"]');
-    if(dBtn && dBtn.closest('#objDiasSemana') === null){
-      var diasCard = document.getElementById('objDiasSemana');
-      if(diasCard){
-        diasCard.value = db.objetivos.dias.meta;
-        var allBtns = document.querySelectorAll('.obj-setup-card');
-        allBtns.forEach(function(card){
-          if(card.querySelector('#objDiasSemana')){
-            card.querySelectorAll('.obj-dia-btn').forEach(function(b){
-              b.classList.toggle('active', b.getAttribute('data-val') == db.objetivos.dias.meta);
-            });
-          }
-        });
+    objs.forEach(function(obj){
+      checkPage(14);
+      doc.setFillColor(GREEN_LIGHT);
+      doc.roundedRect(margin,y,contentW,11,2,2,'F');
+      doc.setFontSize(9);
+      doc.setFont('helvetica','bold');
+      doc.setTextColor(DARK);
+      doc.text(obj.label, margin+3, y+4.5);
+      doc.setFont('helvetica','normal');
+      doc.setTextColor(MUTED);
+      doc.text(obj.val, margin+3, y+8.5);
+      if(obj.pct!==null){
+        // mini barra progreso
+        doc.setFillColor('#cde0d4');
+        doc.roundedRect(W-margin-42, y+3, 40, 5, 2, 2, 'F');
+        doc.setFillColor(GREEN);
+        doc.roundedRect(W-margin-42, y+3, Math.max(2,40*obj.pct/100), 5, 2, 2, 'F');
+        doc.setFontSize(7);
+        doc.setTextColor(GREEN);
+        doc.text(obj.pct+'%', W-margin-1, y+7, {align:'right'});
       }
-    }
-  }
-  if(db.objetivos && db.objetivos.alcohol !== undefined){
-    var aVal = db.objetivos.alcohol.max;
-    document.querySelectorAll('.obj-setup-card').forEach(function(card){
-      if(card.querySelector('#objAlcoholMax')){
-        card.querySelectorAll('.obj-dia-btn').forEach(function(b){
-          b.classList.toggle('active', b.getAttribute('data-val') == aVal);
-        });
-        document.getElementById('objAlcoholMax').value = aVal;
-      }
+      y += 13;
     });
   }
-}
 
-function renderObjetivoPrincipal(){ renderInicioObjetivos(); }
-function renderObjetivosProgreso(){ renderInicioObjetivos(); }
-
-function renderObjetivos(){
-  var sel = document.getElementById('objFuerzaEjercicio');
-  if(!sel) return;
-  var nombres = [...new Set(db.ejercicios.map(function(e){ return e.nombre; }))].sort();
-  sel.innerHTML = '<option value="">Seleccionar ejercicio</option>' +
-    nombres.map(function(n){ return '<option value="'+n+'">'+n+'</option>'; }).join('');
-  db.objetivos = db.objetivos || {};
-  if(db.objetivos.fuerza){
-    if(db.objetivos.fuerza.ejercicio) sel.value = db.objetivos.fuerza.ejercicio;
-    if(db.objetivos.fuerza.actual) { var el=document.getElementById('objFuerzaActual'); if(el) el.value=db.objetivos.fuerza.actual; }
-    if(db.objetivos.fuerza.meta)   { var el2=document.getElementById('objFuerzaMeta'); if(el2) el2.value=db.objetivos.fuerza.meta; }
-  }
-  if(db.objetivos.dias){
-    var v = String(db.objetivos.dias.meta);
-    document.querySelectorAll('#objDiasSemana').forEach(function(inp){ inp.value=v; });
-    document.querySelectorAll('.obj-setup-card').forEach(function(card){
-      if(card.querySelector('#objDiasSemana'))
-        card.querySelectorAll('.obj-dia-btn').forEach(function(b){ b.classList.toggle('active', b.getAttribute('data-val')===v); });
-    });
-  }
-  if(db.objetivos.alcohol !== undefined){
-    var av = String(db.objetivos.alcohol.max);
-    document.querySelectorAll('.obj-setup-card').forEach(function(card){
-      if(card.querySelector('#objAlcoholMax')){
-        card.querySelectorAll('.obj-dia-btn').forEach(function(b){ b.classList.toggle('active', b.getAttribute('data-val')===av); });
-        var inp=document.getElementById('objAlcoholMax'); if(inp) inp.value=av;
-      }
-    });
-  }
-  renderInicioObjetivos();
-}
-
-function progresoObjetivo(valorInicial, valorActual, valorObjetivo){
-  if(!valorInicial || !valorActual || !valorObjetivo) return null;
-  const total=Math.abs(valorInicial-valorObjetivo);
-  if(total===0) return null;
-  const avance=Math.abs(valorInicial-valorActual);
-  return Math.max(0, Math.min(100, Math.round((avance/total)*100)));
-}
-
-function estadoObjetivo(obj){
-  const all=entrenosAll();
-  const f=db.fuerza.filter(x=>enSemana(x.fecha));
-  const c=db.cardio.filter(x=>enSemana(x.fecha));
-  const r=(db.running||[]).filter(x=>enSemana(x.fecha));
-  const x=(db.crossfit||[]).filter(w=>enSemana(w.fecha));
-  const dias=new Set([...f.map(x=>x.fecha),...c.map(x=>x.fecha)]).size;
-  const pierna=f.some(x=>(x.tipo||"")==="Pierna");
-  const torso=f.some(x=>(x.tipo||"")==="Torso");
-  const cardioMin=c.reduce((s,x)=>s+(Number(x.min)||0),0);
-  const runningKm=r.reduce((s,x)=>s+(Number(x.km)||0),0);
-
-  if(dias===0) return {clase:"red",texto:"Desalineado: esta semana todavía no hay entrenamiento registrado."};
-
-  if(obj.principal==="cintura"){
-    if(dias>=3 && pierna && torso && cardioMin>=30) return {clase:"green",texto:"Alineado: fuerza equilibrada y cardio suficiente para ayudar a la cintura."};
-    if(dias>=2) return {clase:"yellow",texto:"Neutral: entrenas, pero falta cardio o equilibrio torso/pierna."};
-    return {clase:"red",texto:"Desalineado: poco volumen semanal para bajar cintura."};
+  // PIE
+  const totalPages = doc.getNumberOfPages();
+  for(let p=1;p<=totalPages;p++){
+    doc.setPage(p);
+    doc.setFillColor(DARK);
+    doc.rect(0, H-10, W, 10, 'F');
+    doc.setFontSize(7);
+    doc.setTextColor('rgba(255,255,255,0.6)');
+    doc.text('Momentum Fit  |  momentum-fit-app.netlify.app', margin, H-4);
+    doc.text(p+' / '+totalPages, W-margin, H-4, {align:'right'});
   }
 
-  if(obj.principal==="fuerza"){
-    const seriesObjetivo=obj.seriesMes || 0;
-    const mes=mesActualKey();
-    const seriesMes=db.fuerza.filter(x=>x.fecha.slice(0,7)===mes && (!obj.fuerzaEjercicio || x.ejercicio===obj.fuerzaEjercicio)).length;
-    if(seriesObjetivo && seriesMes>=Math.ceil((new Date().getDate()/30)*seriesObjetivo)) return {clase:"green",texto:"Alineado: vas en ritmo de series para tu objetivo de fuerza."};
-    if(dias>=2) return {clase:"yellow",texto:"Neutral: entrenas, pero falta volumen específico de fuerza."};
-    return {clase:"red",texto:"Desalineado: poca frecuencia para ganar fuerza."};
-  }
-
-  if(obj.principal==="constancia"){
-    if(obj.entrenosMes){
-      const mes=mesActualKey();
-      const diasMes=[...new Set(all.filter(x=>x.fecha.slice(0,7)===mes).map(x=>x.fecha))].length;
-      const esperado=Math.ceil((new Date().getDate()/30)*obj.entrenosMes);
-      if(diasMes>=esperado) return {clase:"green",texto:`Alineado: llevas ${diasMes} días este mes. Vas en ritmo.`};
-      return {clase:"yellow",texto:`Neutral: llevas ${diasMes} días. Deberías acercarte a ${esperado}.`};
-    }
-    return dias>=3 ? {clase:"green",texto:"Alineado: buena constancia semanal."} : {clase:"yellow",texto:"Neutral: registra más días para consolidar hábito."};
-  }
-
-  if(obj.principal==="peso"){
-    const med=[...db.medidas].sort((a,b)=>b.id-a.id)[0];
-    if(!med || !med.peso || !obj.peso) return {clase:"yellow",texto:"Neutral: faltan peso actual u objetivo."};
-    const margen=obj.pesoMargen || 1;
-    const distancia=Math.abs(med.peso-obj.peso);
-    if(distancia<=margen) return {clase:"green",texto:"Alineado: peso dentro del rango objetivo."};
-    return {clase:"yellow",texto:"Neutral: peso fuera de rango; mira tendencia semanal."};
-  }
-
-  return {clase:"yellow",texto:"Objetivo sin definir."};
+  const fecha=new Date().toISOString().slice(0,10);
+  doc.save('momentum-fit-'+fecha+'.pdf');
+  mostrarConfirmacion('PDF descargado');
 }
-
-function cardObjetivo(obj){
-  const med=[...db.medidas].sort((a,b)=>b.id-a.id)[0];
-  const all=entrenosAll();
-  const mes=mesActualKey();
-  const diasMes=[...new Set(all.filter(x=>x.fecha.slice(0,7)===mes).map(x=>x.fecha))].length;
-
-  function barra(pct){
-    if(pct===null || pct===undefined || isNaN(pct)) return "<span class='pill'>Seguimiento por tendencia</span>";
-    const p=Math.max(0,Math.min(100,Math.round(pct)));
-    return `<div class="progress-wrap"><div class="progress-bar" style="width:${p}%"></div></div><span class="pill">${p}% completado</span>`;
-  }
-
-  let titulo="", detalle="", progreso=null;
-
-  if(obj.principal==="cintura"){
-    const actual=med&&med.cintura?med.cintura:"";
-    progreso=progresoObjetivo(obj.cinturaInicial, actual, obj.cintura);
-    titulo="Bajar cintura";
-    detalle=`Inicio: ${obj.cinturaInicial||"--"} cm · Actual: ${actual||"--"} cm · Meta: ${obj.cintura||"--"} cm`;
-  }
-
-  if(obj.principal==="fuerza"){
-    const regs=db.fuerza.filter(x=>!obj.fuerzaEjercicio || x.ejercicio===obj.fuerzaEjercicio);
-    const best=regs.length ? Math.max(...regs.map(x=>Number(x.kg)||0)) : "";
-    progreso=progresoObjetivo(obj.fuerzaActual, best, obj.fuerzaMeta);
-    titulo="Ganar fuerza";
-    detalle=`${obj.fuerzaEjercicio||"Ejercicio sin definir"} · Inicio: ${obj.fuerzaActual||"--"} kg · Actual: ${best||"--"} kg · Meta: ${obj.fuerzaMeta||"--"} kg`;
-  }
-
-  if(obj.principal==="constancia"){
-    progreso=obj.entrenosMes ? (diasMes/obj.entrenosMes)*100 : null;
-    titulo="Entrenar constante";
-    detalle=`Actual: ${diasMes} días este mes · Meta: ${obj.entrenosMes||"--"} días/mes · Semana: ${obj.diasSemana||"--"} días`;
-  }
-
-  if(obj.principal==="peso"){
-    const actual=med&&med.peso?med.peso:"";
-    progreso=progresoObjetivo(obj.pesoInicial, actual, obj.peso);
-    titulo="Controlar peso";
-    detalle=`Inicio: ${obj.pesoInicial||"--"} kg · Actual: ${actual||"--"} kg · Meta: ${obj.peso||"--"} kg ${obj.pesoMargen?`· Margen ±${obj.pesoMargen} kg`:""}`;
-  }
-
-  const estado=estadoObjetivo(obj);
-
-  return `
-    <div class="card">
-      <div class="item-title">${titulo}</div>
-      <div class="meta">${detalle}</div>
-      ${barra(progreso)}
-      <div class="status ${estado.clase}">${estado.texto}</div>
-      <button type="button" class="red" onclick="borrarObjetivo(${obj.id})">Borrar objetivo</button>
-    </div>
-  `;
-}
-
-function renderObjetivoPrincipal(){
-  renderObjetivosProgreso();
-}
-
-function renderObjetivosProgreso(){
-  const cont=document.getElementById("listaObjetivosProgreso");
-  if(!cont) return;
-  db.objetivosLista=db.objetivosLista||[];
-
-  if(!db.objetivosLista.length){
-    cont.innerHTML='<div class="empty">Aún no tienes objetivos activos.</div>';
-    return;
-  }
-
-  cont.innerHTML=db.objetivosLista.map(cardObjetivo).join("");
-}
-
-function estadoSemanalObjetivo(){
-  const lista=db.objetivosLista||[];
-  if(!lista.length) return {clase:"yellow",texto:"Define un objetivo para obtener lectura semanal."};
-  return estadoObjetivo(lista[0]);
-}
-
-function renderEstadoCopia(){
-  const el=document.getElementById("estadoCopia");if(!el)return;
-  if(!db.lastBackup){el.innerHTML='<span class="pill red">Sin copia exportada</span><div class="meta">Exporta una copia de vez en cuando para no perder datos.</div>';return}
-  const diff=Math.floor((new Date()-new Date(db.lastBackup))/(1000*60*60*24));
-  el.innerHTML=`<span class="pill">${diff} día${diff===1?"":"s"} desde la última copia</span><div class="meta">${diff>7?"Toca exportar copia.":"Copia reciente."}</div>`;
-}
-function exportar(){db.lastBackup=new Date().toISOString();localStorage.setItem(KEY,JSON.stringify(db));const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([JSON.stringify(db,null,2)],{type:"application/json"}));a.download="gym_copia.json";a.click();URL.revokeObjectURL(a.href);renderAll();vibrar(25);mostrarConfirmacion("Copia exportada.")}
-function importar(ev){const f=ev.target.files[0];if(!f)return;const r=new FileReader();r.onload=()=>{try{const data=JSON.parse(r.result);if(!confirm("¿Reemplazar datos actuales?"))return;db=data;localStorage.setItem(KEY,JSON.stringify(db));renderAll();vibrar(25);mostrarConfirmacion("Datos importados.")}catch{alert("Archivo no válido.")}};r.readAsText(f)}
-function reset(){if(!confirm("¿Borrar todo?"))return;db={ejercicios:base.map((x,i)=>({id:Date.now()+i,nombre:x[0],grupo:x[1],tipo:x[2]})),fuerza:[],sesiones:[],cardio:[],running:[],crossfit:[],medidas:[],salud:[],rutinas:[],objetivos:{},lastBackup:"",settings:defaultSettings()};localStorage.setItem(KEY,JSON.stringify(db));renderAll();vibrar(25);mostrarConfirmacion("Datos borrados.")}
-function escapeAttr(s){return String(s).replaceAll("&","&amp;").replaceAll("'","&#39;").replaceAll('"',"&quot;").replaceAll("<","&lt;").replaceAll(">","&gt;")}
-function unescapeAttr(s){const txt=document.createElement("textarea");txt.innerHTML=s;return txt.value}
-
-setTodayFields();toggleCardio();setModoProgreso("ejercicio");ensureSettings();goById("inicio");aplicarConfiguracion();renderAll();mostrarOnboarding(false);
-
-/* Corrección definitiva: meses entrenados */
-function mostrarMesesEntrenados(){
-  vibrar(20);
-
-  const panel = document.getElementById("panelMeses");
-  const cont = document.getElementById("resumenMeses");
-  const card = document.getElementById("diasCard");
-
-  if(!panel || !cont || !card) return;
-
-  const visible = panel.getAttribute("data-visible") === "true";
-
-  if(visible){
-    panel.style.display = "none";
-    panel.setAttribute("data-visible","false");
-    cont.innerHTML = "";
-    card.classList.remove("active-months");
-    return;
-  }
-
-  const all = entrenosAll();
-  const porMes = {};
-
-  all.forEach(x => {
-    if(!x.fecha) return;
-
-    const mes = x.fecha.slice(0,7);
-
-    if(!porMes[mes]){
-      porMes[mes] = new Set();
-    }
-
-    porMes[mes].add(x.fecha);
-  });
-
-  const meses = Object.keys(porMes).sort((a,b)=>b.localeCompare(a));
-
-  panel.style.display = "block";
-  panel.setAttribute("data-visible","true");
-
-  card.classList.add("active-months");
-
-  if(!meses.length){
-    cont.innerHTML = '<div class="empty">Aún no hay entrenamientos registrados.</div>';
-
-    setTimeout(()=>{
-      panel.scrollIntoView({behavior:"smooth", block:"start"});
-    },80);
-
-    return;
-  }
-
-  cont.innerHTML = meses.map(m => {
-    const dias = [...porMes[m]].sort((a,b)=>b.localeCompare(a));
-
-    return `
-      <div class="item">
-        <div class="item-title">${mesNombre(m)}</div>
-        <span class="pill">${dias.length} día${dias.length===1?"":"s"}</span>
-        <div class="meta" style="margin-top:7px">
-          ${dias.map(d=>formatFecha(d).slice(0,5)).join(", ")}
-        </div>
-      </div>
-    `;
-  }).join("");
-
-  setTimeout(()=>{
-    panel.scrollIntoView({behavior:"smooth", block:"start"});
-  },80);
-}
-
-
-/* Correcciones robustas: editar/borrar registros desde Progreso */
-function editarFuerza(id){
-  const r=db.fuerza.find(x=>x.id===id);
-  if(!r){ mostrarConfirmacion("No encuentro el registro"); return; }
-
-  const kg=prompt("Peso kg:", r.kg ?? "");
-  if(kg===null)return;
-
-  const reps=prompt("Repeticiones:", r.reps ?? "");
-  if(reps===null)return;
-
-  const serie=prompt("Serie:", r.serie ?? "");
-  if(serie===null)return;
-
-  r.kg=kg!==""?Number(kg):"";
-  r.reps=reps!==""?Number(reps):"";
-  r.serie=serie!==""?Number(serie):"";
-
-  save();
-  renderAll();
-  mostrarConfirmacion("Registro editado");
-}
-
-function borrarFuerza(id){
-  if(!confirm("¿Borrar esta serie?"))return;
-  db.fuerza=db.fuerza.filter(x=>x.id!==id);
-  save();
-  renderAll();
-  mostrarConfirmacion("Serie borrada");
-}
-
-function editarCardio(id){
-  const r=db.cardio.find(x=>x.id===id);
-  if(!r){ mostrarConfirmacion("No encuentro el registro"); return; }
-
-  const min=prompt("Minutos:", r.min ?? "");
-  if(min===null)return;
-
-  r.min=min!==""?Number(min):"";
-
-  if(r.tipo==="Cinta"){
-    const vel=prompt("Velocidad:", r.vel ?? "");
-    if(vel===null)return;
-    const inc=prompt("Inclinación:", r.inc ?? "");
-    if(inc===null)return;
-    r.vel=vel!==""?Number(vel):"";
-    r.inc=inc!==""?Number(inc):"";
-  }else{
-    const res=prompt("Resistencia/nivel:", r.res ?? "");
-    if(res===null)return;
-    r.res=res!==""?Number(res):"";
-  }
-
-  save();
-  renderAll();
-  mostrarConfirmacion("Cardio editado");
-}
-
-function borrarCardio(id){
-  if(!confirm("¿Borrar este cardio?"))return;
-  db.cardio=db.cardio.filter(x=>x.id!==id);
-  save();
-  renderAll();
-  mostrarConfirmacion("Cardio borrado");
-}
-
-function editarMedida(id){
-  const r=db.medidas.find(x=>x.id===id);
-  if(!r){ mostrarConfirmacion("No encuentro la medición"); return; }
-
-  const peso=prompt("Peso corporal:", r.peso ?? "");
-  if(peso===null)return;
-  const cintura=prompt("Cintura:", r.cintura ?? "");
-  if(cintura===null)return;
-  const grasa=prompt("% grasa:", r.grasa ?? "");
-  if(grasa===null)return;
-
-  r.peso=peso!==""?Number(peso):"";
-  r.cintura=cintura!==""?Number(cintura):"";
-  r.grasa=grasa!==""?Number(grasa):"";
-
-  save();
-  renderAll();
-  mostrarConfirmacion("Medición editada");
-}
-
-function borrarMedida(id){
-  if(!confirm("¿Borrar esta medición?"))return;
-  db.medidas=db.medidas.filter(x=>x.id!==id);
-  save();
-  renderAll();
-  mostrarConfirmacion("Medición borrada");
-}
-
-/* Compatibilidad por si la app llama a otros nombres */
-function editarRegistro(id,tipo){
-  if(tipo==="fuerza")return editarFuerza(id);
-  if(tipo==="cardio")return editarCardio(id);
-  if(tipo==="medidas"||tipo==="medida")return editarMedida(id);
-}
-
-function borrarRegistro(id,tipo){
-  if(tipo==="fuerza")return borrarFuerza(id);
-  if(tipo==="cardio")return borrarCardio(id);
-  if(tipo==="medidas"||tipo==="medida")return borrarMedida(id);
-}
-
-/* Borrar todo con confirmación explícita */
-function borrarTodo(){
-  const ok=confirm("¿Deseas borrar los datos de todos los registros?");
-  if(!ok)return;
-
-  const ok2=confirm("Esta acción borrará entrenamientos, cardio, running, CrossFit, medidas, salud, sesiones, rutinas y objetivos guardados. ¿Confirmas?");
-  if(!ok2)return;
-
-  db.fuerza=[];
-  db.cardio=[];
-  db.running=[];
-  db.crossfit=[];
-  db.medidas=[];
-  db.salud=[];
-  db.sesiones=[];
-  db.rutinas=[];
-  db.objetivos={};
-  db.objetivosLista=[];
-  db.lastBackup="";
-  setActiveSession && setActiveSession(null);
-
-  localStorage.setItem(KEY,JSON.stringify(db));
-  renderAll();
-  mostrarConfirmacion("Todos los registros han sido borrados");
-}
-
-function resetDatos(){
-  borrarTodo();
-}
-
-function borrarTodosLosDatos(){
-  borrarTodo();
-}
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-/* ===== SISTEMA PRO DEFINITIVO EDITAR / ELIMINAR ===== */
-function proGetArray(tipo){
-  if(tipo==="fuerza") return db.fuerza || [];
-  if(tipo==="cardio") return db.cardio || [];
-  if(tipo==="running") return db.running || [];
-  if(tipo==="crossfit") return db.crossfit || [];
-  if(tipo==="medida") return db.medidas || [];
-  return [];
-}
-
-function proFind(tipo,id){
-  id=Number(id);
-  return proGetArray(tipo).find(x=>Number(x.id)===id);
-}
-
-function proCommit(msg){
-  localStorage.setItem(KEY, JSON.stringify(db));
-  // Re-render solo las pantallas de progreso, sin tocar el scroll
-  var scrollY = window.scrollY;
-  try{ renderProgresoEjercicio(); }catch(e){}
-  try{ renderProgresoDia(); }catch(e){}
-  try{ renderProgresoCuerpo(); }catch(e){}
-  try{ renderProgresoWod(); }catch(e){}
-  try{ renderInicio(); }catch(e){}
-  try{ renderDiasConDatos(); }catch(e){}
-  window.scrollTo(0, scrollY);
-  mostrarConfirmacion(msg || "Hecho");
-}
-
-/* --- Modal para editar/eliminar (reemplaza prompt/confirm bloqueados en Edge) --- */
-var _mfCb=null;
-function _mfShow(title,msg,inputVal,okText,danger,cb){
-  var el=document.getElementById('mfModal');
-  document.getElementById('mfTitle').textContent=title;
-  document.getElementById('mfMsg').textContent=msg;
-  var wrap=document.getElementById('mfInputWrap');
-  var inp=document.getElementById('mfInp');
-  var okBtn=document.getElementById('mfOk');
-  if(inputVal!==null){wrap.style.display='block';inp.value=inputVal!=null?String(inputVal):'';setTimeout(function(){inp.focus();inp.select();},60);}
-  else{wrap.style.display='none';}
-  okBtn.textContent=okText||'Aceptar';
-  okBtn.style.background=danger?'linear-gradient(135deg,#b76e63,#d79b8f)':'linear-gradient(135deg,#6f8f7a,#9db58e)';
-  el.style.display='flex';
-  _mfCb=cb;
-}
-function _mfHide(){document.getElementById('mfModal').style.display='none';}
-function _mfOk(){
-  var wrap=document.getElementById('mfInputWrap');
-  var val=wrap.style.display!=='none'?document.getElementById('mfInp').value:true;
-  _mfHide();
-  if(_mfCb){var f=_mfCb;_mfCb=null;f(val);}
-}
-function _mfCancel(){_mfHide();_mfCb=null;}
-
-function _mfSteps(steps,idx,r,tipo){
-  if(idx>=steps.length){
-    if(tipo==='running') r.ritmo=calcularRitmo(r.min,r.km);
-    proCommit('Registro editado');
-    return;
-  }
-  var s=steps[idx];
-  _mfShow(s.t,s.l,r[s.k],idx===steps.length-1?'Guardar':'Siguiente',false,function(val){
-    if(val===null||val===undefined)return;
-    r[s.k]=val!==''?Number(val):'';
-    _mfSteps(steps,idx+1,r,tipo);
-  });
-}
-
-function proEditar(tipo,id){
-  id=Number(id);
-  var r=proFind(tipo,id);
-  if(!r){alert('No encuentro el registro.');return;}
-  var steps=[];
-  if(tipo==='fuerza') steps=[{k:'kg',t:'Editar serie',l:'Peso (kg):'},{k:'reps',t:'Editar serie',l:'Repeticiones:'},{k:'serie',t:'Editar serie',l:'Número de serie:'}];
-  else if(tipo==='cardio'&&r.tipo==='Cinta') steps=[{k:'min',t:'Editar cardio',l:'Minutos:'},{k:'vel',t:'Editar cardio',l:'Velocidad:'},{k:'inc',t:'Editar cardio',l:'Inclinación (%):'} ];
-  else if(tipo==='cardio') steps=[{k:'min',t:'Editar cardio',l:'Minutos:'},{k:'res',t:'Editar cardio',l:'Nivel/Resistencia:'}];
-  else if(tipo==='running') steps=[{k:'km',t:'Editar running',l:'Kilómetros:'},{k:'min',t:'Editar running',l:'Minutos:'}];
-  else if(tipo==='crossfit') steps=[{k:'resultado',t:'Editar WOD',l:'Resultado:'},{k:'min',t:'Editar WOD',l:'Duración (min):'}];
-  else if(tipo==='medida') steps=[{k:'peso',t:'Editar medida',l:'Peso (kg):'},{k:'cintura',t:'Editar medida',l:'Cintura (cm):'},{k:'grasa',t:'Editar medida',l:'% grasa:'}];
-  _mfSteps(steps,0,r,tipo);
-}
-
-function proEliminar(tipo,id){
-  id=Number(id);
-  var r=proFind(tipo,id);
-  if(!r){alert('No encuentro el registro.');return;}
-
-  // Construir descripción legible del registro
-  var detalle='';
-  if(tipo==='fuerza')   detalle=r.kg+'kg · '+r.reps+' reps · Serie '+r.serie+' ('+r.ejercicio+')';
-  if(tipo==='cardio')   detalle=r.tipo+' · '+r.min+' min';
-  if(tipo==='running')  detalle=r.km+'km · '+r.min+' min · '+r.tipo;
-  if(tipo==='crossfit') detalle=(r.nombre||'WOD')+' · '+r.tipo;
-  if(tipo==='medida')   detalle=(r.peso?r.peso+'kg':'')+(r.cintura?' · '+r.cintura+'cm cintura':'');
-
-  _mfShow('¿Eliminar registro?', detalle, null, 'Eliminar', true, function(ok){
-    if(!ok)return;
-    if(tipo==='fuerza')   db.fuerza=(db.fuerza||[]).filter(function(x){return Number(x.id)!==id;});
-    if(tipo==='cardio')   db.cardio=(db.cardio||[]).filter(function(x){return Number(x.id)!==id;});
-    if(tipo==='running')  db.running=(db.running||[]).filter(function(x){return Number(x.id)!==id;});
-    if(tipo==='crossfit') db.crossfit=(db.crossfit||[]).filter(function(x){return Number(x.id)!==id;});
-    if(tipo==='medida')   db.medidas=(db.medidas||[]).filter(function(x){return Number(x.id)!==id;});
-    proCommit('Registro eliminado');
-  });
-}
-
-window.proEditar=proEditar;
-window.proEliminar=proEliminar;
-window.editarRegistroDirecto=function(tipo,id){proEditar(tipo,id);};
-window.eliminarRegistroDirecto=function(tipo,id){proEliminar(tipo,id);};
-
-/* ===== SUPABASE AUTH ===== */
-
-function initSupabase(){
-  return new Promise(function(resolve){
-    if(_supabase){ resolve(); return; }
-    var s = document.createElement('script');
-    s.src = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2';
-    s.onload = function(){
-      _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-      resolve();
-    };
-    s.onerror = function(){ resolve(); }; // offline - continue without
-    document.head.appendChild(s);
-  });
-}
-
-function mostrarLoginError(msg){
-  var el = document.getElementById('loginError');
-  el.textContent = msg;
-  el.style.display = 'block';
-}
-
-function ocultarLoginError(){
-  document.getElementById('loginError').style.display = 'none';
-}
-
-function toggleModoLogin(){
-  _modoRegistro = !_modoRegistro;
-  var titulo = document.getElementById('loginTitle');
-  var subtitulo = document.getElementById('loginSubtitle');
-  var btn = document.getElementById('loginBtn');
-  var regBtn = document.getElementById('registerBtn');
-  var volver = document.getElementById('loginModo');
-
-  if(_modoRegistro){
-    titulo.textContent = 'Crear cuenta';
-    subtitulo.textContent = 'Empieza a entrenar hoy';
-    btn.textContent = 'Crear cuenta';
-    regBtn.style.display = 'none';
-    volver.style.display = 'block';
-  } else {
-    titulo.textContent = 'Bienvenido';
-    subtitulo.textContent = 'Inicia sesión para continuar';
-    btn.textContent = 'Entrar';
-    regBtn.style.display = 'block';
-    volver.style.display = 'none';
-  }
-  ocultarLoginError();
-}
-
-function olvidoContrasena(){
-  var email = document.getElementById('loginEmail').value.trim();
-  if(!email){
-    mostrarLoginError('Introduce tu email primero');
-    return;
-  }
-  if(!_supabase){ mostrarLoginError('Sin conexión'); return; }
-
-  _supabase.auth.resetPasswordForEmail(email, {
-    redirectTo: window.location.href
-  }).then(function(result){
-    if(result.error){
-      mostrarLoginError('Error: ' + result.error.message);
-    } else {
-      document.getElementById('loginError').style.background = '#e7f1e5';
-      document.getElementById('loginError').style.color = '#4f725f';
-      document.getElementById('loginError').textContent = '✅ Te hemos enviado un email para restablecer tu contraseña';
-      document.getElementById('loginError').style.display = 'block';
-    }
-  });
-}
-
-async function iniciarSesion(){
-  var email = document.getElementById('loginEmail').value.trim();
-  var password = document.getElementById('loginPassword').value;
-  var btn = document.getElementById('loginBtn');
-
-  if(!email || !password){
-    mostrarLoginError('Introduce email y contraseña');
-    return;
-  }
-
-  btn.textContent = '...';
-  btn.disabled = true;
-  ocultarLoginError();
-
-  // Asegurarse de que Supabase está cargado
-  if(!_supabase){
-    await initSupabase();
-  }
-
-  if(!_supabase){
-    mostrarLoginError('No se pudo conectar a Supabase. Recarga la página.');
-    btn.textContent = _modoRegistro ? 'Crear cuenta' : 'Entrar';
-    btn.disabled = false;
-    return;
-  }
-
-  try {
-    var result;
-    if(_modoRegistro){
-      result = await _supabase.auth.signUp({ email: email, password: password });
-    } else {
-      result = await _supabase.auth.signInWithPassword({ email: email, password: password });
-    }
-
-    if(result.error){
-      var msg = result.error.message;
-      if(msg.includes('Invalid login')) msg = 'Email o contraseña incorrectos';
-      if(msg.includes('already registered')) msg = 'Este email ya tiene cuenta. Inicia sesión.';
-      if(msg.includes('Password should be')) msg = 'La contraseña debe tener al menos 6 caracteres';
-      if(msg.includes('Email not confirmed')) msg = 'Confirma tu email antes de entrar';
-      mostrarLoginError(msg);
-      btn.textContent = _modoRegistro ? 'Crear cuenta' : 'Entrar';
-      btn.disabled = false;
-      return;
-    }
-
-    _user = result.data.user;
-
-    if(_modoRegistro && result.data.user && !result.data.session){
-      document.getElementById('loginError').style.background = '#e7f1e5';
-      document.getElementById('loginError').style.color = '#4f725f';
-      document.getElementById('loginError').textContent = '✅ Cuenta creada. Revisa tu email para confirmar.';
-      document.getElementById('loginError').style.display = 'block';
-      btn.textContent = 'Crear cuenta';
-      btn.disabled = false;
-      return;
-    }
-
-    await cargarDatosUsuario();
-
-    // Show onboarding for new users
-    if(!db.settings || !db.settings.onboardingDone){
-      document.getElementById('loginScreen').style.display = 'none';
-      document.getElementById('onboardingScreen').style.display = 'block';
-    } else {
-      mostrarApp();
-    }
-
-  } catch(e) {
-    console.error('Supabase error:', e);
-    mostrarLoginError('Error: ' + (e.message || 'Inténtalo de nuevo'));
-    btn.textContent = _modoRegistro ? 'Crear cuenta' : 'Entrar';
-    btn.disabled = false;
-  }
-}
-
-function dbBase(){
-  return {
-    ejercicios:base.map((x,i)=>({id:Date.now()+i,nombre:x[0],grupo:x[1],tipo:x[2]})),
-    fuerza:[],sesiones:[],cardio:[],running:[],crossfit:[],medidas:[],salud:[],
-    rutinas:[],objetivos:{},objetivosLista:[],lastBackup:"",
-    settings:defaultSettings(),athlete:defaultAthlete()
-  };
-}
-
-async function cargarDatosUsuario(){
-  if(!_supabase || !_user) return;
-  try {
-    var { data } = await _supabase
-      .from('user_data')
-      .select('data')
-      .eq('user_id', _user.id)
-      .single();
-
-    if(data && data.data){
-      // Datos de Supabase — siempre tienen prioridad
-      db = Object.assign(JSON.parse(JSON.stringify(dbBase())), data.data);
-      localStorage.setItem(KEY, JSON.stringify(db));
-      localStorage.setItem('mf_uid', _user.id);
-    } else {
-      // Usuario nuevo sin datos — empezar desde cero
-      var cachedUid = localStorage.getItem('mf_uid');
-      if(cachedUid && cachedUid !== _user.id){
-        // Era otro usuario — limpiar
-        localStorage.removeItem(KEY);
-        localStorage.removeItem('mf_uid');
-      }
-      var local = localStorage.getItem(KEY);
-      if(local) try { db = Object.assign(JSON.parse(JSON.stringify(dbBase())), JSON.parse(local)); } catch(e2){}
-      localStorage.setItem('mf_uid', _user.id);
-    }
-  } catch(e) {
-    // Sin conexión — usar localStorage solo si es del mismo usuario
-    var cachedUid = localStorage.getItem('mf_uid');
-    if(cachedUid && cachedUid !== _user.id){
-      localStorage.removeItem(KEY);
-    } else {
-      var local = localStorage.getItem(KEY);
-      if(local) try { db = Object.assign(JSON.parse(JSON.stringify(dbBase())), JSON.parse(local)); } catch(e2){}
-    }
-    localStorage.setItem('mf_uid', _user.id);
-  }
-}
-
-async function guardarDatosNube(){
-  if(!_supabase || !_user){ 
-    console.log('guardarDatosNube: sin supabase o user, solo localStorage');
-    localStorage.setItem(KEY, JSON.stringify(db));
-    return; 
-  }
-  try {
-    var result = await _supabase
-      .from('user_data')
-      .upsert({ user_id: _user.id, data: db, updated_at: new Date().toISOString() });
-    if(result.error) console.error('Error guardando en nube:', result.error);
-    else console.log('✅ Datos guardados en nube');
-  } catch(e) { 
-    console.error('Error guardarDatosNube:', e); 
-  }
-  localStorage.setItem(KEY, JSON.stringify(db));
-}
-
-function mostrarApp(){
-  document.getElementById('loginScreen').style.display = 'none';
-  renderAll();
-  renderInicioObjetivos();
-}
-
-async function cerrarSesion(){
-  if(_supabase) await _supabase.auth.signOut();
-  _user = null;
-  localStorage.removeItem(KEY);
-  document.getElementById('loginScreen').style.display = 'flex';
-}
-
-// Integración directa en proCommit - guardar en nube tras cada cambio
-var _proCommitOriginal = proCommit;
-proCommit = function(msg){
-  guardarDatosNube();
-  _proCommitOriginal(msg);
-};
-
-// También interceptar save() para sincronizar
-var _saveOriginal = save;
-save = function(){
-  localStorage.setItem(KEY, JSON.stringify(db));
-  guardarDatosNube();
-};
-
-// Init on load
-document.addEventListener('DOMContentLoaded', async function(){
-  await initSupabase();
-
-  if(_supabase){
-    var { data: { session } } = await _supabase.auth.getSession();
-    if(session && session.user){
-      _user = session.user;
-      await cargarDatosUsuario();
-      if(!db.settings || !db.settings.onboardingDone){
-        document.getElementById('loginScreen').style.display = 'none';
-        document.getElementById('onboardingScreen').style.display = 'block';
-      } else {
-        mostrarApp();
-      }
-      return;
-    }
-  }
-
-  // No session - show login
-  // But first create the table if needed
-  document.getElementById('loginScreen').style.display = 'flex';
-});
 
 </script>
 </body>
 </html>
-<style>
-/* Corrección visual final del resumen principal */
-#inicio .grid .card {
-  text-align: center;
-}
-#inicio .grid .card .metric {
-  font-size: 20px !important;
-  font-weight: 500 !important;
-  letter-spacing: 0 !important;
-  line-height: 1.15 !important;
-}
-#inicio .grid .card .meta {
-  font-size: 12px !important;
-  font-weight: 400 !important;
-  line-height: 1.25 !important;
-}
-#ultimoDia {
-  font-size: 16px !important;
-  font-weight: 500 !important;
-}
-
-.module-hidden{display:none !important}
-.onboarding{
-  position:fixed; inset:0; background:rgba(38,51,47,.42); z-index:200;
-  display:none; align-items:center; justify-content:center; padding:18px; backdrop-filter:blur(8px);
-}
-.onboarding-card{
-  width:100%; max-width:430px; background:#fff; border-radius:26px; padding:20px;
-  box-shadow:0 18px 46px rgba(38,51,47,.22);
-}
-.onboarding-card h2{margin:0 0 6px;font-size:24px}
-.onboarding-card p{margin:0 0 14px;color:var(--muted);font-size:14px;line-height:1.4}
-.module-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px}
-.module-card{
-  border:1px solid var(--border); border-radius:18px; padding:14px 10px; text-align:center;
-  background:#f8faf7; cursor:pointer; user-select:none;
-}
-.module-card.active{border:2px solid rgba(111,143,122,.55);background:linear-gradient(135deg,#eef3ea,#dfe9dc)}
-.module-card .icon{font-size:24px;display:block;margin-bottom:6px}
-.module-card .name{font-weight:800;font-size:13px}
-.module-card .desc{color:var(--muted);font-size:11px;margin-top:4px}
-.config-row{
-  display:flex; align-items:center; justify-content:space-between; gap:12px;
-  background:rgba(255,255,255,.72); border:1px solid var(--border);
-  border-radius:17px; padding:12px; margin-bottom:10px;
-}
-.config-row strong{display:block;font-size:14px}
-.config-row span{display:block;font-size:12px;color:var(--muted);margin-top:2px}
-.switch{width:52px;min-width:52px;height:30px;border-radius:999px;background:#d8ded5;position:relative;cursor:pointer}
-.switch::after{
-  content:""; position:absolute; width:24px; height:24px; top:3px; left:3px;
-  border-radius:50%; background:white; box-shadow:0 3px 8px rgba(0,0,0,.16); transition:.18s;
-}
-.switch.on{background:linear-gradient(135deg,var(--accent),var(--accent2))}
-.switch.on::after{left:25px}
-
-</style>
-
-<style>
-#diasCard.active-months{
-  border:2px solid rgba(111,143,122,.45) !important;
-  background:linear-gradient(135deg,#eef3ea,#dfe9dc) !important;
-  transform:scale(1.01);
-  transition:all .2s ease;
-}
-#panelMeses{
-  scroll-margin-top:120px;
-}
-
-.module-hidden{display:none !important}
-.onboarding{
-  position:fixed; inset:0; background:rgba(38,51,47,.42); z-index:200;
-  display:none; align-items:center; justify-content:center; padding:18px; backdrop-filter:blur(8px);
-}
-.onboarding-card{
-  width:100%; max-width:430px; background:#fff; border-radius:26px; padding:20px;
-  box-shadow:0 18px 46px rgba(38,51,47,.22);
-}
-.onboarding-card h2{margin:0 0 6px;font-size:24px}
-.onboarding-card p{margin:0 0 14px;color:var(--muted);font-size:14px;line-height:1.4}
-.module-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px}
-.module-card{
-  border:1px solid var(--border); border-radius:18px; padding:14px 10px; text-align:center;
-  background:#f8faf7; cursor:pointer; user-select:none;
-}
-.module-card.active{border:2px solid rgba(111,143,122,.55);background:linear-gradient(135deg,#eef3ea,#dfe9dc)}
-.module-card .icon{font-size:24px;display:block;margin-bottom:6px}
-.module-card .name{font-weight:800;font-size:13px}
-.module-card .desc{color:var(--muted);font-size:11px;margin-top:4px}
-.config-row{
-  display:flex; align-items:center; justify-content:space-between; gap:12px;
-  background:rgba(255,255,255,.72); border:1px solid var(--border);
-  border-radius:17px; padding:12px; margin-bottom:10px;
-}
-.config-row strong{display:block;font-size:14px}
-.config-row span{display:block;font-size:12px;color:var(--muted);margin-top:2px}
-.switch{width:52px;min-width:52px;height:30px;border-radius:999px;background:#d8ded5;position:relative;cursor:pointer}
-.switch::after{
-  content:""; position:absolute; width:24px; height:24px; top:3px; left:3px;
-  border-radius:50%; background:white; box-shadow:0 3px 8px rgba(0,0,0,.16); transition:.18s;
-}
-.switch.on{background:linear-gradient(135deg,var(--accent),var(--accent2))}
-.switch.on::after{left:25px}
-
-</style>
