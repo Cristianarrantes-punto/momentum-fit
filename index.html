@@ -6836,6 +6836,308 @@ async function exportarPDF(){
   mostrarConfirmacion('PDF descargado');
 }
 
+/* ===== SUPABASE AUTH FUNCTIONS ===== */
+function initSupabase(){
+  return new Promise(function(resolve){
+    if(_supabase){ resolve(); return; }
+    var s=document.createElement('script');
+    s.src='https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2';
+    s.onload=function(){
+      _supabase=supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
+      resolve();
+    };
+    s.onerror=function(){ resolve(); };
+    document.head.appendChild(s);
+  });
+}
+
+function mostrarLoginError(msg){
+  var el=document.getElementById('loginError');
+  el.textContent=msg;
+  el.style.display='block';
+}
+function ocultarLoginError(){
+  document.getElementById('loginError').style.display='none';
+}
+
+function toggleModoLogin(){
+  _modoRegistro=!_modoRegistro;
+  var titulo=document.getElementById('loginTitle');
+  var subtitulo=document.getElementById('loginSubtitle');
+  var btn=document.getElementById('loginBtn');
+  var regBtn=document.getElementById('registerBtn');
+  var volver=document.getElementById('loginModo');
+  if(_modoRegistro){
+    titulo.textContent='Crear cuenta';
+    subtitulo.textContent='Empieza a entrenar hoy';
+    btn.textContent='Crear cuenta';
+    regBtn.style.display='none';
+    volver.style.display='block';
+  } else {
+    titulo.textContent='Bienvenido';
+    subtitulo.textContent='Inicia sesión para continuar';
+    btn.textContent='Entrar';
+    regBtn.style.display='block';
+    volver.style.display='none';
+  }
+  ocultarLoginError();
+}
+
+function olvidoContrasena(){
+  var email=document.getElementById('loginEmail').value.trim();
+  if(!email){ mostrarLoginError('Introduce tu email primero'); return; }
+  if(!_supabase){ mostrarLoginError('Sin conexión'); return; }
+  _supabase.auth.resetPasswordForEmail(email,{redirectTo:window.location.href}).then(function(result){
+    if(result.error){ mostrarLoginError('Error: '+result.error.message); }
+    else {
+      document.getElementById('loginError').style.background='#e7f1e5';
+      document.getElementById('loginError').style.color='#4f725f';
+      document.getElementById('loginError').textContent='✅ Te hemos enviado un email para restablecer tu contraseña';
+      document.getElementById('loginError').style.display='block';
+    }
+  });
+}
+
+async function iniciarSesion(){
+  var email=document.getElementById('loginEmail').value.trim();
+  var password=document.getElementById('loginPassword').value;
+  var btn=document.getElementById('loginBtn');
+  if(!email||!password){ mostrarLoginError('Introduce email y contraseña'); return; }
+  btn.textContent='...';
+  btn.disabled=true;
+  ocultarLoginError();
+  if(!_supabase){ await initSupabase(); }
+  if(!_supabase){
+    mostrarLoginError('No se pudo conectar. Recarga la página.');
+    btn.textContent=_modoRegistro?'Crear cuenta':'Entrar';
+    btn.disabled=false;
+    return;
+  }
+  try {
+    var result;
+    if(_modoRegistro){
+      result=await _supabase.auth.signUp({email:email,password:password});
+    } else {
+      result=await _supabase.auth.signInWithPassword({email:email,password:password});
+    }
+    if(result.error){
+      var msg=result.error.message;
+      if(msg.includes('Invalid login')) msg='Email o contraseña incorrectos';
+      if(msg.includes('already registered')) msg='Este email ya tiene cuenta. Inicia sesión.';
+      if(msg.includes('Password should be')) msg='La contraseña debe tener al menos 6 caracteres';
+      if(msg.includes('Email not confirmed')) msg='Confirma tu email antes de entrar';
+      mostrarLoginError(msg);
+      btn.textContent=_modoRegistro?'Crear cuenta':'Entrar';
+      btn.disabled=false;
+      return;
+    }
+    _user=result.data.user;
+    if(_modoRegistro&&result.data.user&&!result.data.session){
+      document.getElementById('loginError').style.background='#e7f1e5';
+      document.getElementById('loginError').style.color='#4f725f';
+      document.getElementById('loginError').textContent='✅ Cuenta creada. Revisa tu email para confirmar.';
+      document.getElementById('loginError').style.display='block';
+      btn.textContent='Crear cuenta';
+      btn.disabled=false;
+      return;
+    }
+    await cargarDatosUsuario();
+    if(!db.settings||!db.settings.onboardingDone){
+      document.getElementById('loginScreen').style.display='none';
+      document.getElementById('onboardingScreen').style.display='block';
+    } else {
+      mostrarApp();
+    }
+  } catch(e){
+    console.error('Supabase error:',e);
+    mostrarLoginError('Error: '+(e.message||'Inténtalo de nuevo'));
+    btn.textContent=_modoRegistro?'Crear cuenta':'Entrar';
+    btn.disabled=false;
+  }
+}
+
+function dbBase(){
+  return {
+    ejercicios:base.map((x,i)=>({id:Date.now()+i,nombre:x[0],grupo:x[1],tipo:x[2]})),
+    fuerza:[],sesiones:[],cardio:[],running:[],crossfit:[],medidas:[],salud:[],
+    rutinas:[],objetivos:{},objetivosLista:[],lastBackup:'',
+    settings:defaultSettings(),athlete:defaultAthlete?defaultAthlete():{}
+  };
+}
+
+async function cargarDatosUsuario(){
+  if(!_supabase||!_user) return;
+  try {
+    var {data}=await _supabase.from('user_data').select('data').eq('user_id',_user.id).single();
+    if(data&&data.data){
+      var base2=dbBase();
+      db=Object.assign(base2,data.data);
+      if(data.data.settings) db.settings=Object.assign(base2.settings,data.data.settings);
+      localStorage.setItem(KEY,JSON.stringify(db));
+      localStorage.setItem('mf_uid',_user.id);
+    } else {
+      var cachedUid=localStorage.getItem('mf_uid');
+      if(cachedUid&&cachedUid!==_user.id){ localStorage.removeItem(KEY); localStorage.removeItem('mf_uid'); }
+      var local=localStorage.getItem(KEY);
+      if(local) try { db=Object.assign(dbBase(),JSON.parse(local)); } catch(e2){}
+      localStorage.setItem('mf_uid',_user.id);
+    }
+  } catch(e){
+    var cachedUid=localStorage.getItem('mf_uid');
+    if(cachedUid&&cachedUid!==_user.id){ localStorage.removeItem(KEY); }
+    else { var local=localStorage.getItem(KEY); if(local) try { db=Object.assign(dbBase(),JSON.parse(local)); } catch(e2){} }
+    localStorage.setItem('mf_uid',_user.id);
+  }
+}
+
+async function guardarDatosNube(){
+  if(!_supabase||!_user){ localStorage.setItem(KEY,JSON.stringify(db)); return; }
+  try {
+    await _supabase.from('user_data').upsert({user_id:_user.id,data:db,updated_at:new Date().toISOString()});
+  } catch(e){ console.error('Error guardando:',e); }
+  localStorage.setItem(KEY,JSON.stringify(db));
+}
+
+function mostrarApp(){
+  document.getElementById('loginScreen').style.display='none';
+  document.getElementById('onboardingScreen').style.display='none';
+  if(_user){
+    var email=_user.email||'';
+    var iniciales=email.substring(0,2).toUpperCase();
+    var avatar=document.getElementById('userAvatarBtn');
+    if(avatar) avatar.textContent=iniciales;
+    var emailLabel=document.getElementById('userMenuEmail');
+    if(emailLabel) emailLabel.textContent=email;
+    var confEmail=document.getElementById('userEmailLabel');
+    if(confEmail) confEmail.textContent=email;
+  }
+  renderAll();
+  renderInicioObjetivos();
+  checkNotificaciones();
+}
+
+async function cerrarSesion(){
+  if(_supabase) await _supabase.auth.signOut();
+  _user=null;
+  localStorage.removeItem(KEY);
+  localStorage.removeItem('mf_uid');
+  db=dbBase();
+  document.getElementById('loginScreen').style.display='flex';
+}
+
+function confirmarCerrarSesion(){
+  if(confirm('¿Seguro que quieres cerrar sesión?')) cerrarSesion();
+}
+
+function toggleUserMenu(){
+  var menu=document.getElementById('userMenu');
+  if(menu) menu.style.display=menu.style.display==='none'||!menu.style.display?'block':'none';
+}
+function cerrarUserMenu(){
+  var menu=document.getElementById('userMenu');
+  if(menu) menu.style.display='none';
+}
+document.addEventListener('click',function(e){
+  var btn=document.getElementById('userAvatarBtn');
+  var menu=document.getElementById('userMenu');
+  if(btn&&menu&&!btn.contains(e.target)&&!menu.contains(e.target)) menu.style.display='none';
+});
+
+/* ===== SISTEMA DE NOTIFICACIONES ===== */
+function cerrarNotif(){
+  document.getElementById('notifBanner').style.display='none';
+}
+function mostrarNotif(icon,title,sub){
+  document.getElementById('notifIcon').textContent=icon;
+  document.getElementById('notifTitle').textContent=title;
+  document.getElementById('notifSub').textContent=sub;
+  document.getElementById('notifBanner').style.display='flex';
+  clearTimeout(window._notifTimer);
+  window._notifTimer=setTimeout(cerrarNotif,6000);
+}
+function checkNotificaciones(){
+  var all=entrenosAll?entrenosAll():[];
+  if(!all||!all.length) return;
+  var ultimo=all[0];
+  if(!ultimo) return;
+  var hoy=new Date();
+  var fechaUltimo=new Date(ultimo.fecha);
+  var diasSin=Math.floor((hoy-fechaUltimo)/(1000*60*60*24));
+  var hoyStr=today();
+  if(localStorage.getItem('mf_notif_date')===hoyStr) return;
+  var notif=null;
+  if(diasSin>=7){
+    notif={icon:'🔥',title:'¡Llevas '+diasSin+' días sin entrenar!',sub:'Tu racha te está esperando. Hoy puede ser el día.'};
+  } else if(diasSin>=3){
+    notif={icon:'💪',title:diasSin+' días desde tu último entreno',sub:'Un poco de movimiento marca la diferencia.'};
+  } else if(diasSin===0 && Math.random()<0.3){
+    notif={icon:'🏆',title:'¡Entrenaste hoy!',sub:'Constancia es lo que te llevará donde quieres.'};
+  }
+  if(notif){
+    localStorage.setItem('mf_notif_date',hoyStr);
+    setTimeout(function(){ mostrarNotif(notif.icon,notif.title,notif.sub); },2000);
+  }
+}
+
+/* ===== PWA: Service Worker ===== */
+if('serviceWorker' in navigator){
+  var swCode=[
+    "const CACHE='momentum-fit-v1';",
+    "const FILES=['/'];",
+    "self.addEventListener('install',function(e){",
+    "  e.waitUntil(caches.open(CACHE).then(function(c){return c.addAll(FILES);}));",
+    "});",
+    "self.addEventListener('fetch',function(e){",
+    "  e.respondWith(caches.match(e.request).then(function(r){return r||fetch(e.request);}));",
+    "});"
+  ].join('\n');
+  var blob=new Blob([swCode],{type:'application/javascript'});
+  var swUrl=URL.createObjectURL(blob);
+  navigator.serviceWorker.register(swUrl).catch(function(){});
+}
+
+/* ===== PWA: Install prompt ===== */
+var _pwaPrompt=null;
+window.addEventListener('beforeinstallprompt',function(e){
+  e.preventDefault();
+  _pwaPrompt=e;
+  var btn=document.getElementById('pwaInstallBtn');
+  if(btn) btn.style.display='flex';
+});
+function instalarPWA(){
+  if(_pwaPrompt){
+    _pwaPrompt.prompt();
+    _pwaPrompt.userChoice.then(function(){ _pwaPrompt=null; });
+  }
+}
+window.addEventListener('appinstalled',function(){
+  var btn=document.getElementById('pwaInstallBtn');
+  if(btn) btn.style.display='none';
+  mostrarConfirmacion('✅ ¡App instalada!');
+});
+
+/* ===== INIT ===== */
+document.addEventListener('DOMContentLoaded', async function(){
+  await initSupabase();
+
+  if(_supabase){
+    var { data: { session } } = await _supabase.auth.getSession();
+    if(session && session.user){
+      _user = session.user;
+      await cargarDatosUsuario();
+      if(!db.settings || !db.settings.onboardingDone){
+        document.getElementById('loginScreen').style.display = 'none';
+        document.getElementById('onboardingScreen').style.display = 'block';
+      } else {
+        mostrarApp();
+      }
+      return;
+    }
+  }
+
+  document.getElementById('loginScreen').style.display = 'flex';
+});
+
 </script>
 </body>
 </html>
